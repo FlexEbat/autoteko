@@ -2,20 +2,58 @@
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
+.yarn/
+.pnpm-store/
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
+yarn-error.log*
 pnpm-debug.log*
+*.log
+logs/
 
-# Build output
+# Build output and caches
+.next/
+out/
 dist/
 build/
+.turbo/
+.vercel/
+.eslintcache
+*.tsbuildinfo
+
+# Tests and coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Database dumps and local data (the schema file stays tracked)
+*.dump
+*.bak
+*.sqlite
+*.sqlite3
+
+# Uploads and local exports
+uploads/
+*.xlsx
+!public/**/*.xlsx
 
 # Local OS and editor files
 .DS_Store
 Thumbs.db
 .vscode/
+.idea/
+*.swp
+*.swo
+*~

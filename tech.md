@@ -1,6 +1,6 @@
 # tech.md: AUTEKO
 
-**Версия: v1** (2026-10-11)
+**Версия: v2** (2026-10-12)
 
 **Основано на шаблоне: t1**
 
@@ -8,6 +8,7 @@
 
 Changelog:
 
+- v2 (2026-10-12): мобильное приложение на Expo заменено на PWA (маршруты `/m` в `apps/web`). Изменения контракта: сессия клиента PWA хранится в cookie вместо токенов (`sessions.kind` принимает `web` и `pwa`, поля `refresh_hash` и `family_id` удалены, точка `POST /api/v1/auth/refresh` удалена, добавлены коды ошибок `session_expired` и `session_revoked`); канал синхронизации не отдаёт поля себестоимости ни одной роли; удалены `apps/mobile` и зависимости Expo; добавлены каталоги `app/m`, `public/pwa`, `src/pwa`, `next.config.ts`, скрипт `build-pwa.ts`, dev-зависимость `fake-indexeddb`; job'ы `mobile-*` заменены на `pwa-unit` и `pwa-e2e`; слайсы 11-14 переписаны; в режиме без HTTPS PWA отключается.
 - v1: первая версия спецификации проекта AUTEKO. Заморожены (слайс 0A): схема данных (раздел 4), API модуля данных (раздел 5), наборы UI-примитивов веба и мобильного клиента (раздел 6), контракт API v1 и синхронизации (раздел 7), матрица прав (раздел 4). Локализация отложена: продукт одноязычный (ru), слайс L выполняется только при добавлении второго языка. Отклонения от шаблона t1: документы проекта пишутся по-русски (раздел 11); вместо одного слайса функции введены слайсы 1-14 и H; раздел 18 описывает два режима доступа (`internal` и `public`).
 
 ---
@@ -30,12 +31,12 @@ Changelog:
 | язык исходника `tech.md`           | ru                                                                                    |
 | языки продукта и документов        | ru                                                                                    |
 | язык продукта по умолчанию         | ru                                                                                    |
-| профиль стека                      | свой: TypeScript, Next.js, Expo, PostgreSQL (приложение A шаблона удалено)            |
+| профиль стека                      | свой: TypeScript, Next.js, PostgreSQL (приложение A шаблона удалено)                  |
 | версия рантайма или компилятора    | Node.js 26, TypeScript 7                                                              |
 | запуск задач                       | npm scripts (npm workspaces)                                                          |
 | платформа CI                       | GitHub Actions                                                                        |
-| способ поставки                    | web-сервис и мобильное приложение; сервер в контейнерах (Docker Compose)              |
-| есть пользовательский интерфейс    | да (web-панель и мобильное приложение)                                                |
+| способ поставки                    | web-сервис с устанавливаемой PWA для менеджеров; сервер в контейнерах (Docker Compose) |
+| есть пользовательский интерфейс    | да (web-панель и мобильная PWA)                                                       |
 | есть пользователи и аутентификация | да                                                                                    |
 | локализация                        | отложена, режим в шапке файла                                                         |
 | лицензия                           | MIT                                                                                   |
@@ -44,9 +45,9 @@ Changelog:
 
 ## 1. Проект
 
-AUTEKO это внутренняя система учёта запчастей для дизельных двигателей (серии 12М55, 12-16М33, 16М33, 12М33), которые компания закупает в Китае и продаёт в России. Она заменяет учёт в Excel единой базой PostgreSQL. Пользователи: руководитель, бухгалтер и закупщик работают в web-панели, менеджеры по продажам работают в мобильном приложении (iOS и Android), в том числе без сети. Основные действия: вести номенклатуру, считать себестоимость партий в рублях с НДС, контролировать остатки, оформлять коммерческие предложения и сделки, следить за сроками поставки и оплаты.
+AUTEKO это внутренняя система учёта запчастей для дизельных двигателей (серии 12М55, 12-16М33, 16М33, 12М33), которые компания закупает в Китае и продаёт в России. Она заменяет учёт в Excel единой базой PostgreSQL. Пользователи: руководитель, бухгалтер и закупщик работают в web-панели, менеджеры по продажам работают в мобильной PWA (устанавливается на главный экран телефона, iOS и Android), в том числе без сети. Основные действия: вести номенклатуру, считать себестоимость партий в рублях с НДС, контролировать остатки, оформлять коммерческие предложения и сделки, следить за сроками поставки и оплаты.
 
-Цель: готовый продукт, а не MVP. Он закрывает весь список функций ниже, переживает обновления и сбои, имеет документацию и релизный конвейер. Не цели (нет в ТЗ, владелец может поднять через `CONTRACT GAP`): интеграция с 1С и бухгалтерские проводки; печать договоров, спецификаций и УПД (хранятся только их номера и даты, PDF создаётся только для КП); несколько складов и перемещения между ними; валюты кроме юаня; онлайн-оплата; портал клиента; мультиарендность; push-уведомления; обновление мобильного приложения по воздуху (OTA); сертификатный пиннинг мобильного клиента.
+Цель: готовый продукт, а не MVP. Он закрывает весь список функций ниже, переживает обновления и сбои, имеет документацию и релизный конвейер. Не цели (нет в ТЗ, владелец может поднять через `CONTRACT GAP`): интеграция с 1С и бухгалтерские проводки; печать договоров, спецификаций и УПД (хранятся только их номера и даты, PDF создаётся только для КП); несколько складов и перемещения между ними; валюты кроме юаня; онлайн-оплата; портал клиента; мультиарендность; push-уведомления; фоновая отправка и синхронизация при закрытом приложении; нативные приложения для App Store и Google Play.
 
 Список функций (каждая станет слайсом из раздела 15):
 
@@ -60,14 +61,14 @@ AUTEKO это внутренняя система учёта запчастей 
 8. Коммерческие предложения с PDF (слайс 8).
 9. Панель руководителя: сводка и отчёты (слайс 9).
 10. Журнал аудита и настройки (слайс 10).
-11. API мобильного клиента и синхронизация (слайс 11).
-12. Мобильное приложение: каркас, вход, локальная база, синхронизация (слайс 12).
-13. Мобильное приложение: поиск и карточка товара с остатками (слайс 13).
-14. Мобильное приложение: сделки и КП (слайс 14).
+11. API для PWA и синхронизация (слайс 11).
+12. Мобильная PWA: установка, вход, зашифрованное локальное хранилище, синхронизация (слайс 12).
+13. Мобильная PWA: поиск и карточка товара с остатками (слайс 13).
+14. Мобильная PWA: сделки и КП (слайс 14).
 15. Режимы доступа и защита `internal` и `public` (слайс H).
 16. Резервные копии и восстановление, в том числе кнопками в интерфейсе (слайс E).
 
-Окружение и доверие. Работают 10-20 сотрудников. Сервер стоит на VPS за обратным прокси Caddy, мобильные клиенты ходят по HTTPS. Данные: коммерческая тайна (закупочные цены, себестоимость, маржа, список контрагентов с ИНН), персональные данные сотрудников и контактных лиц клиентов. Угрозы: подбор и кража паролей, перехват токена на потерянном телефоне, утечка себестоимости менеджером, сканирование и эксплуатация уязвимостей из интернета (режим `public`), потеря данных, взлом цепочки поставки зависимостей и конвейера. Режим `internal`: доступ только из внутренней сети или VPN. Режим `public`: сервис открыт в интернет. Меры для обоих режимов описаны в разделе 18, различаются только обязательные настройки.
+Окружение и доверие. Работают 10-20 сотрудников. Сервер стоит на VPS за обратным прокси Caddy, мобильная PWA работает только по HTTPS (service worker и установка требуют защищённого контекста). Данные: коммерческая тайна (закупочные цены, себестоимость, маржа, список контрагентов с ИНН), персональные данные сотрудников и контактных лиц клиентов. Угрозы: подбор и кража паролей, кража сессии на потерянном телефоне, утечка себестоимости менеджером, сканирование и эксплуатация уязвимостей из интернета (режим `public`), потеря данных, взлом цепочки поставки зависимостей и конвейера. Режим `internal`: доступ только из внутренней сети или VPN. Режим `public`: сервис открыт в интернет. Меры для обоих режимов описаны в разделе 18, различаются только обязательные настройки.
 
 Решения по ТЗ. Места, где ТЗ не задаёт правило или оставляет выбор, закрыты так:
 
@@ -79,8 +80,8 @@ AUTEKO это внутренняя система учёта запчастей 
 | ГТД «10210020/051026/0012345»                     | номер хранится строкой `^\d{8}/\d{6}/\d{7}$`, дата ГТД отдельным полем, при пустой дате берётся из сегмента `DDMMYY`                                                                      |
 | «поле ID товара полностью исключено»              | технический `id` (uuid) нигде не показывается человеку, поиск и карточки идут по `auteko_article` и `original_articles`                                                                   |
 | управление правами                                | четыре роли: `admin` (руководитель), `accountant` (бухгалтер), `buyer` (закупщик), `sales` (менеджер); матрица в разделе 4; `sales` не видит себестоимость и прибыль                       |
-| синхронизация каждые 15 минут                     | на iOS фоновое выполнение управляется системой и не гарантируется; приложение синхронизируется по таймеру 15 минут при открытом экране, фоновой задачей по возможности и по свайпу вниз |
-| мобильное приложение «iOS/Android»                | одна кодовая база на React Native (Expo), локальная база SQLite с шифрованием                                                                                                           |
+| синхронизация каждые 15 минут                     | фоновая работа при закрытом приложении в PWA недоступна на iOS и ненадёжна в других браузерах, а данные зашифрованы PIN, поэтому синхронизация идёт по таймеру 15 минут при открытом приложении, при возврате на экран, при появлении сети и жестом «потянуть вниз»; очередь изменений уходит при открытии приложения |
+| мобильное приложение «iOS/Android»                | PWA: одна кодовая база с web-панелью (маршруты `/m`), устанавливается на главный экран, данные в IndexedDB зашифрованы ключом, защищённым PIN; нативных приложений нет |
 | сделка                                            | одна позиция: клиент, товар, партия; несколько позиций оформляются несколькими сделками, из КП они создаются одним действием                                                              |
 
 Нефункциональные требования. Эталонное окружение: 2 vCPU, 4 ГБ RAM, PostgreSQL на том же хосте, 20 000 товаров, 60 000 партий, 300 000 сделок.
@@ -89,10 +90,10 @@ AUTEKO это внутренняя система учёта запчастей 
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | объём данных         | 20 000 товаров, 60 000 партий, 300 000 сделок, 5 000 контрагентов, 20 000 КП без деградации                                                                                                 |
 | время отклика (web)  | список товаров с поиском p95 не больше 300 мс, карточка не больше 150 мс, создание сделки не больше 400 мс, PDF КП на 30 позиций не больше 3 с, импорт 1000 строк не больше 30 с             |
-| мобильное приложение | поиск по локальной базе на 20 000 товаров не больше 100 мс, холодный старт до списка не больше 3 с, pull на 500 изменений не больше 1 с, офлайн-очередь до 500 мутаций                       |
+| мобильная PWA        | поиск по индексу в памяти на 20 000 товаров не больше 100 мс, холодный старт до списка (с вводом PIN) не больше 3 с, pull на 500 изменений не больше 1 с, офлайн-очередь до 500 мутаций |
 | параллелизм          | 50 одновременных запросов без ошибок, 20 пользователей одновременно, при гонке за остаток продаж больше остатка нет                                                                         |
-| платформы и браузеры | Node.js 26, PostgreSQL 18, Chrome, Edge, Firefox, Safari последних двух версий; iOS и Android не ниже минимума Expo SDK 57 (записывается в `apps/mobile/app.config.ts`)                    |
-| доступность сервиса  | один экземпляр приложения; простой при обновлении не больше 5 минут; процесс перезапускается контейнером; мобильное приложение работает офлайн; цель восстановления: RTO 1 час, RPO 24 часа |
+| платформы и браузеры | Node.js 26, PostgreSQL 18, Chrome, Edge, Firefox, Safari последних двух версий; PWA: Safari на iOS 17 и новее (установка через «На экран Домой»), Chrome на Android 120 и новее |
+| доступность сервиса  | один экземпляр приложения; простой при обновлении не больше 5 минут; процесс перезапускается контейнером; мобильная PWA работает офлайн; цель восстановления: RTO 1 час, RPO 24 часа |
 | обновление           | с любого предыдущего релиза 1.x; перед миграцией схемы автоматически создаётся резервная копия                                                                                              |
 | резервная копия      | `pg_dump -Fc` ежедневно в 03:00 (`APP_TIMEZONE`), перед миграцией и перед восстановлением; хранение 14 ежедневных, 8 еженедельных, 6 ежемесячных; шифрование AES-256-GCM; проверка после создания |
 | наблюдаемость        | структурный журнал JSON в stdout, проверки живости и готовности, `/api/version`, идентификатор запроса, журнал аудита в БД                                                                    |
@@ -105,15 +106,15 @@ AUTEKO это внутренняя система учёта запчастей 
 
 - Рантайм: Node.js 26 (LTS с октября 2026), версия записана в `.nvmrc` и в `engines` корневого `package.json`. Скрипты проекта это файлы `.ts`, их запускает `node` напрямую (снятие типов встроено, в `tsconfig` включён `erasableSyntaxOnly`).
 - Язык и фреймворк web: TypeScript 7 (строгий режим, `noUncheckedIndexedAccess`), React 19, Next.js 16 (App Router, Server Components, Server Actions), Tailwind CSS 4.
-- Мобильное приложение: Expo SDK 57, React Native 0.87, Expo Router, `expo-sqlite` (SQLCipher), `expo-secure-store`, `expo-background-task`, `expo-task-manager`, `expo-network`, `expo-file-system`, `expo-sharing`, `expo-local-authentication`, `@shopify/flash-list`.
+- Мобильная PWA: часть `apps/web` (маршруты `/m`), отдельных зависимостей нет: IndexedDB (собственная обёртка `pwa/db/idb.ts`), Web Crypto, service worker (`public/pwa/sw.js`, обычный JavaScript), Web App Manifest, Web Share API, `navigator.storage.persist()`.
 - Хранилище: PostgreSQL 18 (PostgreSQL 19 на дату v1 в бета-версии, не используется), адрес из переменной окружения `DATABASE_URL`. Расширение `pg_trgm`. Идентификаторы `uuidv7()` средствами PostgreSQL.
 - Доступ к БД: драйвер `pg`, SQL пишется вручную через тегированный шаблон `sql` (раздел 5), миграции это файлы `db/migrations/NNNN_name.sql` и собственный запуск (`migrate.ts`).
 - Зависимости web: `next`, `react`, `react-dom`, `pg`, `@node-rs/argon2`, `otpauth`, `qrcode`, `exceljs`, `pdf-lib`, `@pdf-lib/fontkit`, `pino`, `ipaddr.js`, `zod` (только конверты API и синхронизации). Общий пакет `packages/shared` зависит от `zod`.
-- Инструменты разработки: `typescript`, `eslint`, `typescript-eslint`, `eslint-plugin-vitest`, `prettier`, `prettier-plugin-tailwindcss`, `vitest`, `@vitest/coverage-v8`, `fast-check`, `@playwright/test`, `@axe-core/playwright`, `@stryker-mutator/core`, `@stryker-mutator/vitest-runner`, `lefthook`, `@types/node`, `@types/pg`, `@types/qrcode`. Внешние программы: `gitleaks`, `pg_dump` и `pg_restore` (в образе приложения), Maestro (мобильные e2e).
+- Инструменты разработки: `typescript`, `eslint`, `typescript-eslint`, `eslint-plugin-vitest`, `prettier`, `prettier-plugin-tailwindcss`, `vitest`, `@vitest/coverage-v8`, `fast-check`, `@playwright/test`, `@axe-core/playwright`, `@stryker-mutator/core`, `@stryker-mutator/vitest-runner`, `lefthook`, `@types/node`, `@types/pg`, `@types/qrcode`, `fake-indexeddb`. Внешние программы: `gitleaks`, `pg_dump` и `pg_restore` (в образе приложения).
 - Новая зависимость появляется только через `CONTRACT GAP`. Запрещены: ORM и построители запросов; стейт-менеджеры (Redux, Zustand и подобные); UI-библиотеки и CSS-in-JS; `xlsx` (версия из npm 0.18.5 содержит неисправленные уязвимости, замена `exceljs`); `jsonwebtoken` и `bcryptjs` (сессии непрозрачные, пароли `argon2id`); `dotenv` (окружение читает Node через `--env-file`); `moment` и аналоги (даты через `Intl` и строки ISO 8601).
-- Версии на дату v1 (реестр npm): next 16.4.0, react 19.3.0, typescript 7.0.2, tailwindcss 4.3.3, expo 57.0.27, react-native 0.87.1, eslint 10.12.0, vitest 5.0.3, @playwright/test 1.64.0, zod 4.6.5, pg 8.23.1. Слайс 0A закрепляет точные версии в `package-lock.json`, дальше их обновляет Dependabot. Несовместимая пара инструментов (например, ESLint и TypeScript) решается выбором ближайшей совместимой версии с записью в CHANGELOG, это не `CONTRACT GAP`.
+- Версии на дату v1 (реестр npm): next 16.4.0, react 19.3.0, typescript 7.0.2, tailwindcss 4.3.3, eslint 10.12.0, vitest 5.0.3, @playwright/test 1.64.0, zod 4.6.5, pg 8.23.1. Слайс 0A закрепляет точные версии в `package-lock.json`, дальше их обновляет Dependabot. Несовместимая пара инструментов (например, ESLint и TypeScript) решается выбором ближайшей совместимой версии с записью в CHANGELOG, это не `CONTRACT GAP`.
 
-Команды проверок. Имена задач одинаковы в любом стеке. Каждая задача запускается через npm scripts корня репозитория и обходит все рабочие области (`packages/shared`, `apps/web`, `apps/mobile`).
+Команды проверок. Имена задач одинаковы в любом стеке. Каждая задача запускается через npm scripts корня репозитория и обходит все рабочие области (`packages/shared`, `apps/web`).
 
 | задача      | что делает                                                           | команда                                                                    |
 | ----------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -135,7 +136,7 @@ AUTEKO это внутренняя система учёта запчастей 
 | `gate`      | составная: `fmt`, `lint`, `types`, `docs`, `criteria`, `cov`         | составная                                                                  |
 | `gate-full` | составная: `gate`, `build`, `e2e`                                    | составная                                                                  |
 
-Проектные задачи (не входят в `gate`): `dev` (запуск web), `db:migrate`, `db:reset` (только при `NODE_ENV` не `production`), `user:create`, `backup:run`, `backup:verify`, `backup:restore`, `mobile:start`.
+Проектные задачи (не входят в `gate`): `dev` (запуск web), `db:migrate`, `db:reset` (только при `NODE_ENV` не `production`), `user:create`, `backup:run`, `backup:verify`, `backup:restore`.
 
 Скрипты `check-docs`, `check-criteria`, `check-commit-msg`, `check-workflows` пишутся на TypeScript. Поведение описано в разделах 9, 11, 17 и 20, у каждого есть собственные тесты (слайс 0B).
 
@@ -171,6 +172,9 @@ packages/shared/
     i18n/ index.ts, ru.ts           общие ключи: ошибки, статусы, роли
   tests/ ...
 apps/web/
+  next.config.ts                                  заголовки для service worker и манифеста
+  public/pwa/  sw.js  manifest.webmanifest  precache.json
+               icons/icon-192.png icon-512.png icon-maskable-512.png apple-touch-icon.png
   src/
     proxy.ts  instrumentation.ts
     app/
@@ -190,8 +194,12 @@ apps/web/
         admin/users/ page.tsx [id]/page.tsx actions.ts
         admin/audit/page.tsx  admin/settings/ page.tsx actions.ts
         admin/backups/ page.tsx actions.ts
+      m/                      мобильная PWA: статические оболочки без данных, данные берутся из IndexedDB
+        layout.tsx  page.tsx  login/page.tsx  search/page.tsx  product/page.tsx
+        deals/page.tsx  deals/new/page.tsx  deal/page.tsx
+        quotes/page.tsx  quotes/new/page.tsx  quote/page.tsx  settings/page.tsx
       api/health/live/route.ts  api/health/ready/route.ts  api/version/route.ts
-      api/v1/auth/login/route.ts  api/v1/auth/refresh/route.ts  api/v1/auth/logout/route.ts
+      api/v1/auth/login/route.ts  api/v1/auth/logout/route.ts
       api/v1/me/route.ts  api/v1/sync/pull/route.ts  api/v1/sync/push/route.ts
       api/v1/quotes/[id]/pdf/route.ts
       export/products/route.ts  export/deals/route.ts  export/stock/route.ts
@@ -209,25 +217,17 @@ apps/web/
                  common-passwords.txt totp.ts crypto.ts tokens.ts guard.ts
       export/    xlsx.ts csv.ts quote-pdf.ts fonts/PTSans-Regular.ttf fonts/PTSans-Bold.ttf
       backup/    run.ts verify.ts restore.ts retention.ts stream-crypto.ts
+    pwa/
+      ui/      Screen BottomNav ArticleLabel SyncBanner PullToRefresh InstallHint PinPad VirtualList
+      db/      idb.ts schema.ts migrations.ts vault.ts queries.ts search-index.ts
+      sync/    engine.ts outbox.ts pull.ts push.ts triggers.ts
+      auth/    session.ts lock.ts
+      api/     client.ts
     i18n/ index.ts  ru.ts
   tests/ helpers/ ...
   e2e/   empty.*.spec.ts  *.spec.ts      файлы empty.* читают пустое хранилище и ничего не пишут
-apps/mobile/
-  app.config.ts  eas.json  babel.config.js  metro.config.js
-  app/ _layout.tsx  (auth)/login.tsx  (tabs)/_layout.tsx  (tabs)/search.tsx  (tabs)/deals.tsx
-       (tabs)/quotes.tsx  (tabs)/settings.tsx  product/[article].tsx  deal/new.tsx  deal/[id].tsx
-       quote/new.tsx  quote/[id].tsx
-  src/
-    ui/       Screen Card ArticleLabel StockBadge Button TextField EmptyState SyncBanner
-    db/       local-db.ts schema.ts migrations.ts queries.ts
-    sync/     engine.ts outbox.ts pull.ts push.ts background.ts
-    auth/     session.ts lock.ts
-    api/      client.ts
-    i18n/     index.ts ru.ts
-  tests/ helpers/ ...
-  e2e/ *.yaml                           сценарии Maestro
 scripts/
-  check-docs.ts  check-criteria.ts  check-commit-msg.ts  check-workflows.ts
+  check-docs.ts  check-criteria.ts  check-commit-msg.ts  check-workflows.ts  build-pwa.ts
   create-user.ts  backup.ts
 ```
 
@@ -274,9 +274,7 @@ scripts/
 | -------------- | ------------- | ---------------------------------------------------------------------- |
 | `id`           | text          | PK, SHA-256 (hex) от токена, сам токен в БД не хранится                |
 | `user_id`      | uuid          | FK `users`, on delete cascade                                          |
-| `kind`         | text          | `web`, `mobile`                                                        |
-| `refresh_hash` | text          | null, уникален, только для `mobile`                                    |
-| `family_id`    | uuid          | not null, общий для цепочки обновлений                                 |
+| `kind`         | text          | `web`, `pwa`                                                           |
 | `device_name`  | text          | null, до 100                                                           |
 | `ip`           | inet          | null                                                                   |
 | `user_agent`   | text          | null, до 300                                                           |
@@ -358,7 +356,7 @@ scripts/
 | `upd_date`             | date           | null                                                                    |
 | `status`               | text           | `new`, `confirmed`, `shipped`, `done`, `cancelled`                      |
 | `notes`                | text           | null                                                                    |
-| `client_request_id`    | uuid           | null, уникален, идемпотентность создания с мобильного клиента           |
+| `client_request_id`    | uuid           | null, уникален, идемпотентность создания из PWA           |
 | `version`              | integer        | not null, растёт на 1 при каждом изменении                              |
 | `created_at`, `updated_at`, `sync_seq` | | как у `products`                                                      |
 
@@ -403,7 +401,7 @@ export interface Batch {
   version: number; created_at: IsoDateTime; updated_at: IsoDateTime
 }
 
-// Урезанная партия для роли sales и для мобильного клиента
+// Урезанная партия для роли sales и для канала синхронизации PWA (его получают все роли)
 export type BatchPublic = Pick<Batch, 'id' | 'batch_number' | 'product_id' | 'price_kp_rub' | 'version' | 'updated_at'> & { received: number; sold: number; balance: number }
 
 export interface Deal {
@@ -479,8 +477,8 @@ listUsers(db): Promise<User[]>   getUser(db, id): Promise<User | undefined>   ge
 createUser(db, v: NewUser): Promise<User>   updateUser(db, id, patch): Promise<User | undefined>   countActiveAdmins(db): Promise<number>
 recordLoginFailure(db, id, lockUntil: Date | null): Promise<void>   recordLoginSuccess(db, id): Promise<void>
 createSession(db, v: NewSession): Promise<void>   getSession(db, idHash): Promise<Session | undefined>
-touchSession(db, idHash, now): Promise<void>   rotateRefresh(db, refreshHash, next: NewSession): Promise<RotateResult>
-revokeSession(db, idHash): Promise<void>   revokeFamily(db, familyId): Promise<void>   revokeUserSessions(db, userId, exceptHash?): Promise<number>   listUserSessions(db, userId): Promise<Session[]>
+touchSession(db, idHash, now): Promise<void>
+revokeSession(db, idHash): Promise<void>   revokeUserSessions(db, userId, exceptHash?): Promise<number>   listUserSessions(db, userId): Promise<Session[]>
 
 // products.ts
 listProducts(db, q: ProductListQuery): Promise<Page<Product>>        // search, engine, status, page, limit
@@ -574,22 +572,22 @@ getMutation(db, id): Promise<SyncMutation | undefined>   saveMutation(tx, m: Syn
 - Тексты примитивы получают параметрами. Своих строк у них нет.
 - Отдельного экрана-витрины примитивов нет. Элемент, который не используется ни одним слайсом, не пишется.
 
-### Мобильное приложение
+### Мобильная PWA
 
-Примитивы лежат в `apps/mobile/src/ui`. Экраны: «Поиск и справка» (вкладка `search`, карточка `product/[article]`), «Сделки» (вкладка `deals`, `deal/new`, `deal/[id]`), «КП» (вкладка `quotes`, `quote/new`, `quote/[id]`), «Настройки» (вкладка `settings`: пользователь, состояние синхронизации, блокировка, выход).
+Маршруты `/m` это статические оболочки без данных пользователя, экраны клиентские и читают данные из локального хранилища. Используются примитивы web-панели (`Button`, `Input`, `Select`, `Textarea`, `Field`, `Badge`, `StockBadge`, `StatusPill`, `Alert`, `EmptyState`): корневой элемент `/m` несёт атрибут `data-touch`, при котором область нажатия не меньше 44 на 44 css-пикселя. Собственные примитивы лежат в `apps/web/src/pwa/ui`. Экраны: «Поиск и справка» (`/m/search`, карточка `/m/product`), «Сделки» (`/m/deals`, `/m/deals/new`, `/m/deal`), «КП» (`/m/quotes`, `/m/quotes/new`, `/m/quote`), «Настройки» (`/m/settings`: пользователь, состояние синхронизации, блокировка, установка, выход).
 
-| компонент      | пропсы                                                                                         |
-| -------------- | ---------------------------------------------------------------------------------------------- |
-| `Screen`       | `title`, `children`, `onRefresh`, `refreshing` (pull-to-refresh запускает синхронизацию)       |
-| `Card`         | `onPress`, `children`                                                                          |
-| `ArticleLabel` | `article` (крупно), `original` (светло, для справки)                                           |
-| `StockBadge`   | `status`, `balance` (зелёный, жёлтый, красный и число)                                         |
-| `Button`       | `variant`, `onPress`, `disabled`, `loading`                                                    |
-| `TextField`    | `label`, `value`, `onChangeText`, `error`, `keyboardType`                                      |
-| `EmptyState`   | `title`, `text`                                                                                |
-| `SyncBanner`   | `state` (`idle`, `syncing`, `offline`, `error`), `lastSyncAt`, `pending`                       |
+| компонент       | пропсы                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `Screen`        | `title`, `children`, `onRefresh`, `refreshing` (заголовок, содержимое, баннер синхронизации)    |
+| `BottomNav`     | `items` (поиск, сделки, КП, настройки), `current`                                               |
+| `ArticleLabel`  | `article` (крупно), `original` (светло, для справки)                                            |
+| `SyncBanner`    | `state` (`idle`, `syncing`, `offline`, `error`), `lastSyncAt`, `pending`                        |
+| `PullToRefresh` | `onRefresh`, `children` (жест «потянуть вниз», на устройствах без касаний кнопка «Обновить»)    |
+| `InstallHint`   | `platform` (`android`, `ios`, `other`): кнопка установки или инструкция «Поделиться, На экран Домой» |
+| `PinPad`        | `length`, `onComplete`, `error`                                                                 |
+| `VirtualList`   | `items`, `rowHeight`, `render` (рисует только видимые строки списков от 100 позиций)            |
 
-Списки (100 и больше позиций) строятся на `FlashList`. На карточке товара основной идентификатор `auteko_article` крупным шрифтом, `original_articles` светлым.
+Параметры страниц передаются в строке запроса (`/m/product?article=`, `/m/deal?id=`, `/m/quote?id=`), потому что оболочки статические. Основной идентификатор товара `auteko_article` показывается крупно, `original_articles` светло.
 
 ---
 
@@ -618,13 +616,14 @@ Web-страницы. Роли берутся из матрицы раздела
 | `/admin/backups`              | список копий, создать, проверить, скачать, удалить, восстановить            | `create`, `verify`, `delete`, `restore`                               |
 | `/export/products`, `/export/deals`, `/export/stock` | выгрузка XLSX или CSV (`?format=`)                       | только GET                                                            |
 
-API v1 (мобильный клиент) и служебные точки. Аутентификация мобильного клиента: `Authorization: Bearer <access_token>`. Ошибка во всех случаях: `{ "error": { "code": "<код раздела 8>", "details"?: {...} } }`.
+Мобильная PWA (маршруты `/m`): `/m` (перенаправление на `/m/search` или `/m/login`), `/m/login`, `/m/search`, `/m/product?article=`, `/m/deals`, `/m/deals/new`, `/m/deal?id=`, `/m/quotes`, `/m/quotes/new`, `/m/quote?id=`, `/m/settings`. Страницы `/m` не содержат данных пользователя и отдаются без проверки сессии, доступ к данным определяют `/api/v1` и локальное хранилище. Статические файлы PWA: `/pwa/sw.js` (область `/m/`), `/pwa/manifest.webmanifest`, `/pwa/precache.json`, `/pwa/icons/*`.
+
+API v1 (клиент PWA) и служебные точки. Аутентификация: cookie сессии вида `pwa` (`__Host-auteko_pwa` при `https`, `auteko_pwa` при `http`). Изменяющие запросы несут заголовок `X-Auteko-Client: pwa` и проходят проверку `Origin`. Ошибка во всех случаях: `{ "error": { "code": "<код раздела 8>", "details"?: {...} } }`.
 
 | метод и путь                         | вход                                                      | выход                                                                            |
 | ------------------------------------ | --------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `POST /api/v1/auth/login`            | `email`, `password`, `totp?`, `device_name`               | `access_token` (15 мин), `refresh_token` (30 дней, ротация), `user`              |
-| `POST /api/v1/auth/refresh`          | `refresh_token`                                           | новая пара токенов; повтор использованного токена отзывает всю цепочку (401)     |
-| `POST /api/v1/auth/logout`           | заголовок авторизации                                     | 204, сессия отозвана                                                             |
+| `POST /api/v1/auth/login`            | `email`, `password`, `totp?`, `device_name`               | 200 `user`, cookie сессии `pwa`, токенов в теле нет                              |
+| `POST /api/v1/auth/logout`           | cookie сессии                                             | 204, сессия отозвана, cookie очищена                                             |
 | `GET /api/v1/me`                     |                                                           | `user`, `settings` (`low_stock_threshold`, `default_vat_pct`)                    |
 | `GET /api/v1/sync/pull`              | `cursor` (число, по умолчанию 0), `limit` (до 500)        | `changes` по сущностям, `next_cursor`, `has_more`, `server_time`                 |
 | `POST /api/v1/sync/push`             | `mutations[]`: `id`, `type`, `payload`, `base_version?`   | `results[]`: `id`, `status` (`applied`, `duplicate`, `rejected`), `code?`, `entity?` |
@@ -657,7 +656,7 @@ export type ErrorCode = FieldErrorCode | DomainErrorCode
 // поле + проблема: `${field}_${problem}`, field из разделов 4 и ниже, problem из списка
 export type FieldProblem = 'required' | 'invalid' | 'too_long' | 'out_of_range' | 'duplicate'
 export type DomainErrorCode =
-  | 'unauthenticated' | 'forbidden' | 'not_found' | 'invalid_id' | 'invalid_body' | 'body_too_large'
+  | 'unauthenticated' | 'session_expired' | 'session_revoked' | 'forbidden' | 'not_found' | 'invalid_id' | 'invalid_body' | 'body_too_large'
   | 'rate_limited' | 'maintenance' | 'version_conflict' | 'insufficient_stock' | 'invalid_transition'
   | 'delivery_date_required' | 'payment_date_required' | 'product_archived' | 'product_has_batches'
   | 'batch_has_deals' | 'client_has_deals' | 'batch_product_mismatch'
@@ -752,7 +751,7 @@ export function parseArticleList(raw: unknown): string[] // деление по 
 
 Изоляция:
 
-- Каталог `tests/` это каталог `tests/` рабочей области (`packages/shared`, `apps/web`, `apps/mobile`), каталог `e2e/` лежит в `apps/web/e2e` и `apps/mobile/e2e`. Тесты работают с настоящим PostgreSQL 18 (контейнер из `compose.yaml` локально, сервис в CI). Адрес берётся из `TEST_DATABASE_URL` (переменная только для тестов), имя базы обязано заканчиваться на `_test`, иначе тесты не стартуют. На каждый файл тестов создаётся база из шаблона с применёнными миграциями, `resetDb()` в начале каждого теста очищает таблицы и сбрасывает счётчики. Рабочую базу тесты не трогают. Тесты копий и восстановления создают временный каталог и удаляют его.
+- Каталог `tests/` это каталог `tests/` рабочей области (`packages/shared`, `apps/web`), каталог `e2e/` лежит в `apps/web/e2e`. Тесты работают с настоящим PostgreSQL 18 (контейнер из `compose.yaml` локально, сервис в CI). Адрес берётся из `TEST_DATABASE_URL` (переменная только для тестов), имя базы обязано заканчиваться на `_test`, иначе тесты не стартуют. На каждый файл тестов создаётся база из шаблона с применёнными миграциями, `resetDb()` в начале каждого теста очищает таблицы и сбрасывает счётчики. Рабочую базу тесты не трогают. Тесты копий и восстановления создают временный каталог и удаляют его.
 - Обработчики вызываются напрямую с подставленным входом через `tests/helpers`. Хелперы проверяют результат перенаправления, отказа и ошибки.
 - Время, случайные числа и сеть подменяются или не используются. Порядок тестов не влияет на результат.
 
@@ -785,11 +784,12 @@ E2E:
 - Экземпляры стартуют с явными переменными окружения: адрес, лимит тела, адрес тестовой базы.
 - Что повторяется по темам и языкам, названо в критерии. До слайса L проверка идёт на языке по умолчанию.
 
-Мобильное приложение:
+Мобильная PWA:
 
-- Логика (`sync`, `db`, `auth`, форматирование) проверяется Vitest на `node:sqlite` с теми же запросами, что в `expo-sqlite`. Доступ к локальной БД идёт через интерфейс `LocalDb`, который в тестах подменяется. Часы, таймеры и сеть подменяются.
-- Сквозные сценарии это файлы Maestro (`apps/mobile/e2e/*.yaml`) на эмуляторе Android, job `mobile-e2e`. Критерии с пометкой `(CI: mobile-e2e)` проверяет он.
-- Критерии с пометкой `(CI: mobile-unit)` проверяет job `mobile-unit`, в том числе замер поиска на 20 000 товаров.
+- Логика (`sync`, `db`, `auth`, шифрование хранилища, поисковый индекс) проверяется Vitest на `fake-indexeddb` и Web Crypto из Node. Доступ к IndexedDB идёт через интерфейс, который в тестах подменяется. Часы, таймеры и сеть подменяются.
+- Сквозные сценарии это Playwright в мобильном профиле (Chromium и WebKit) с включённым service worker и переходом в офлайн (`setOffline`), job `pwa-e2e`. Критерии с пометкой `(CI: pwa-e2e)` проверяет он.
+- Критерии с пометкой `(CI: pwa-unit)` проверяет job `pwa-unit`, в том числе замер поиска на 20 000 товаров.
+
 ---
 
 ## 10. Проверки и гейт
@@ -798,7 +798,7 @@ E2E:
 
 - `gate` = `fmt`, `lint`, `types`, `docs`, `criteria`, `cov`. До слайса 0B `gate` = `fmt`, `lint`, `types`, `test`.
 - `gate-full` = `gate`, `build`, `e2e`.
-- В CI дополнительно идут `audit`, `secrets`, `mut`, `codeql`, `mobile-unit`.
+- В CI дополнительно идут `audit`, `secrets`, `mut`, `codeql`, `pwa-unit`.
 
 `gate` красный: слайс не закрыт. Правки по гейту делаются в том же заходе. Слайс закрывает зелёный CI (раздел 20).
 
@@ -823,6 +823,7 @@ Git-хуки (задача `hooks`):
 | pre-push   | `gate`                              |
 
 Хуки дают быструю обратную связь. Обязательный барьер это CI: пропуск хуков (`--no-verify`) его не обходит.
+
 ---
 
 ## 11. Конвенция текста
@@ -848,6 +849,7 @@ type(scope): summary
 Правила письма для всей прозы проекта (коммиты, комментарии, README): активный залог, конкретика вместо общих фраз, без вводных оборотов, без длинного тире, без наречий-усилителей. Комментарий объясняет причину решения, а не пересказывает соседнюю строку. Закомментированный код не оставлять.
 
 Перед написанием README посмотри [https://docs.github.com/en](https://docs.github.com/en), [https://github.com/matiassingers/awesome-readme](https://github.com/matiassingers/awesome-readme), [https://www.makeareadme.com/](https://www.makeareadme.com/)
+
 ---
 
 ## 12. Definition of Done
@@ -856,7 +858,7 @@ type(scope): summary
 
 1. Критерии приёмки слайса из раздела 15 выполнены. Формы и сценарии проверены руками в браузере или терминале, для веба в обоих режимах, с JS и без.
 2. Тесты написаны из критериев, `gate` зелёный, `criteria` не называет ни одного критерия без теста.
-3. Если у продукта есть UI: страницы и состояния слайса добавлены в список `e2e` проверки доступности, нарушений нет. Для экранов мобильного приложения добавлены сценарии Maestro.
+3. Если у продукта есть UI: страницы и состояния слайса добавлены в список `e2e` проверки доступности, нарушений нет. Для экранов PWA добавлены сценарии Playwright в мобильном профиле.
 4. Каждая новая видимая строка есть в словаре языка по умолчанию. Другие языки появятся в слайсе L.
 5. Новых файлов, абстракций и зависимостей сверх описанных в этом файле нет.
 6. Мёртвого кода, заглушек, `TODO` и `FIXME` нет: неиспользуемые экспорты, компоненты, стили, ключи словаря.
@@ -867,7 +869,8 @@ type(scope): summary
 
 ### Всего продукта
 
-Продукт принят, когда закрыты все слайсы раздела 15 и выполнены критерии слайса R: функции из раздела 1 работают, нефункциональные требования подтверждены замерами, обновление с предыдущего релиза и восстановление из резервной копии проверены, модель угроз раздела 18 пройдена, документы полные и вычитаны (переводов нет, пока язык один), мобильное приложение установлено на реальные устройства iOS и Android, релиз-кандидат отработал срок прогона без блокирующих дефектов.
+Продукт принят, когда закрыты все слайсы раздела 15 и выполнены критерии слайса R: функции из раздела 1 работают, нефункциональные требования подтверждены замерами, обновление с предыдущего релиза и восстановление из резервной копии проверены, модель угроз раздела 18 пройдена, документы полные и вычитаны (переводов нет, пока язык один), PWA установлена на реальные устройства iOS и Android и проходит основной сценарий без сети, релиз-кандидат отработал срок прогона без блокирующих дефектов.
+
 ---
 
 ## 13. CONTRACT GAP
@@ -885,6 +888,7 @@ CONTRACT GAP
 Код с выдуманным типом не пиши. Схему данных, тип сущности, API модуля данных, список примитивов сам не расширяй.
 
 К контракту относятся также: матрица прав, список ролей, контракт API v1 и синхронизации, список языков, имена cookie и переменных окружения, имена задач, формат шапки перевода, режим `Локализация`, дерево папок из раздела 3, список зависимостей из раздела 2, нефункциональные требования из раздела 1. Новый ключ словаря контрактом не считается: слайс добавляет ключи сам, в словарь языка по умолчанию.
+
 ---
 
 ## 14. Правила поведения в сессии
@@ -911,7 +915,7 @@ CONTRACT GAP
 
 1. **Каркас.** Слайсы 0A и 0B. Перед 0A владелец ставит тег `prototype-v0` на текущий `main`: код прототипа (Next.js 14, `src/`) остаётся справочным примером поведения для слайсов 2, 3, 4 и 6, дальше его заменяет новый код. Фичи не начинаются, пока критерии каркаса не зелёные.
 2. **Ядро.** Слайсы 1-6: вход и роли, товары, контрагенты, партии, остатки, сделки.
-3. **Остальные функции.** Слайсы 7-14: импорт и экспорт, КП, панель, аудит, API и синхронизация, мобильное приложение.
+3. **Остальные функции.** Слайсы 7-14: импорт и экспорт, КП, панель, аудит, API и синхронизация, мобильная PWA.
 4. **Защита.** Слайс H.
 5. **Эксплуатационная готовность.** Слайс E.
 6. **Документация.** Слайс D (на языке исходника).
@@ -928,7 +932,7 @@ CONTRACT GAP
 
 **Что собрать:**
 
-- Монорепозиторий (npm workspaces): `packages/shared`, `apps/web`, `apps/mobile` (проект Expo без экранов, только чтобы `lint` и `types` его охватывали). Зафиксированная версия Node, зависимости из раздела 2, задачи таблицы раздела 2, нужные до 0B (`fmt`, `fmt-write`, `lint`, `types`, `test`, `build`, `gate`).
+- Монорепозиторий (npm workspaces): `packages/shared`, `apps/web`. Зафиксированная версия Node, зависимости из раздела 2, задачи таблицы раздела 2, нужные до 0B (`fmt`, `fmt-write`, `lint`, `types`, `test`, `build`, `gate`).
 - `packages/shared`: `types`, `roles`, `permissions` (таблица прав раздела 4 и функция `toPublicBatch`), `money`, `calc`, `stock`, `dates`, `ids`, `normalize`, `domain-literals`, `errors`, общий словарь `i18n`.
 - `apps/web`: `config`, `logger`, `errors`, слой данных (`db`, `sql`, `migrate`, `mappers`, `counters`), миграция `0001_init.sql` (все таблицы раздела 4, индексы, триггер `set_sync_seq`, роли БД `auteko_app` и `auteko_migrator`), `safe-redirect`, `headers` (заголовки раздела 18, которые ставит приложение), все примитивы раздела 6, каркас экрана, глобальные стили, заглушка страницы `/`.
 - Правила линтера раздела 18, запрет `skip`, `only`, `TODO`, `FIXME`, заглушек. `.gitignore` (уже расширен), `.prettierignore`, `compose.yaml` только с сервисом `db` для разработки.
@@ -1011,7 +1015,7 @@ CONTRACT GAP
 
 **Тесты:** `passwords`, `totp`, `crypto`, `tokens`, `auth-service`, `users-service`, `guard-routes`, e2e `login` (с JS и без JS); таблицы случаев в самих тестах.
 
-**Не делать:** вход через внешних провайдеров, восстановление пароля по почте (сброс делает администратор), мобильные токены (слайс 11).
+**Не делать:** вход через внешних провайдеров, восстановление пароля по почте (сброс делает администратор), сессии клиента PWA (слайс 11).
 
 ---
 
@@ -1235,88 +1239,90 @@ CONTRACT GAP
 
 ---
 
-### Слайс 11: API мобильного клиента и синхронизация
+### Слайс 11: API для PWA и синхронизация
 
 **Файлы:** `packages/shared/src/sync.ts`, `server/data/sync.ts`, `server/services/sync.ts`, `api/v1/**`.
 
-**Что делает:** токены для мобильного клиента, выдача изменений по курсору, приём мутаций офлайн-очереди.
+**Что делает:** вход клиента PWA с сессией в cookie, выдача изменений по курсору, приём мутаций офлайн-очереди. Канал синхронизации не передаёт поля себестоимости никому, независимо от роли.
 
 **Критерии приёмки:**
 
-1. `login`, `refresh`, `logout` по разделу 7: пароль и TOTP, `totp_enrollment_required` в режиме `public` для пользователя без 2FA, имя устройства сохраняется, `access_token` живёт 15 минут, `refresh_token` ротируется, повтор использованного `refresh_token` отзывает всю цепочку (401).
-2. Токены случайны (не меньше 256 бит), в БД только хеши, просроченный `access_token` отклоняется (подставленные часы), отозванная сессия получает 401 на следующем запросе.
+1. `login` и `logout` по разделу 7: пароль и TOTP, `totp_enrollment_required` в режиме `public` для пользователя без 2FA; создаётся сессия `pwa`, cookie с атрибутами раздела 18 (`HttpOnly`, `SameSite=Lax`, `Secure`, префикс `__Host-` при `https`), имя устройства сохраняется, токенов в теле ответа нет.
+2. Сессия `pwa`: идентификатор случаен (не меньше 256 бит), в БД только SHA-256, простой 30 дней со скользящим продлением и абсолютный срок 90 дней (подставленные часы). Просроченная сессия получает 401 `session_expired`, отозванная и сессия деактивированного пользователя получают 401 `session_revoked`, выход отзывает сессию на сервере.
 3. `pull`: курсор 0 возвращает все разрешённые роли сущности страницами до `limit` (не больше 500) по возрастанию `sync_seq`, `next_cursor` равен последнему `sync_seq`, повтор с `next_cursor` возвращает только более новое, удалённые клиенты приходят с `deleted_at`, архивные товары со статусом.
-4. Охват по ролям: `sales` получает товары, клиентов, партии как `BatchPublic` (с остатками), свои сделки и свои КП; `buyer` и `accountant` по матрице раздела 4. В ответе `sales` нет ни одного поля из списка скрытых полей (свойство на случайных данных).
+4. Охват по ролям: `sales` получает товары, клиентов, партии как `BatchPublic` (с остатками), свои сделки и свои КП; `buyer`, `accountant` и `admin` получают набор по матрице раздела 4, но партии тоже только как `BatchPublic`. В ответе нет ни одного поля из списка скрытых полей раздела 4 ни у одной роли (свойство на случайных данных).
 5. Изменение остатка чужой сделкой попадает в следующий `pull` как изменение партии.
 6. Конкурентность: параллельные записи во время выдачи изменений не теряют строк (повторяемый стресс-тест, курсор доходит до конца без пропусков).
 7. `push`: `deal.create` идемпотентна по `id` мутации (повтор даёт `duplicate` с прежним результатом), нехватка остатка даёт `rejected` с `insufficient_stock`, ошибки валидации по мутации не мешают соседним (частичный успех, порядок сохранён), не больше 100 мутаций и 1 МБ на запрос.
 8. `deal.update` и `quote.update` с `base_version`: совпадение применяется, расхождение даёт `version_conflict` и актуальную сущность; права как в разделе 4 (`sales` только свои, до `shipped`).
 9. `quote.create` и `quote.update` по правилам слайса 8; `deal_number` и `quote_number` назначает сервер и возвращает в `entity`.
-10. Лимит частоты `sync` 60 запросов в минуту на пользователя (подставленные часы).
-11. Единый формат ошибки, 401 при плохом токене, 403 при запрете роли, 400 при неверном теле (ошибки `zod` преобразуются в коды), 413 при большом теле.
-12. Контрактный тест: схемы `packages/shared/src/sync.ts` принимают реальные ответы сервера.
-13. `GET /api/v1/quotes/{id}/pdf` требует токена и отдаёт PDF только владельцу КП или `admin`.
+10. Защита cookie-сессии: изменяющий запрос к `/api/v1` без заголовка `X-Auteko-Client: pwa` или с чужим `Origin` получает 403, чтение с cookie работает, запрос без cookie получает 401.
+11. Лимит частоты `sync` 60 запросов в минуту на пользователя (подставленные часы).
+12. Единый формат ошибки, 403 при запрете роли, 400 при неверном теле (ошибки `zod` преобразуются в коды), 413 при большом теле.
+13. Контрактный тест: схемы `packages/shared/src/sync.ts` принимают реальные ответы сервера.
+14. `GET /api/v1/quotes/{id}/pdf` требует сессии и отдаёт PDF только владельцу КП или `admin`.
 
-**Тесты:** `api-auth`, `sync-pull`, `sync-push`, `sync-concurrency`, `sync-contract`, `api-errors`.
+**Тесты:** `api-auth`, `api-session`, `sync-pull`, `sync-push`, `sync-concurrency`, `sync-contract`, `api-errors`.
 
-**Не делать:** WebSocket и push-уведомления, дельты по полям, сжатие тела.
+**Не делать:** WebSocket и Web Push, дельты по полям, сжатие тела, токены в теле ответа.
 
 ---
 
-### Слайс 12: мобильное приложение, каркас и синхронизация
+### Слайс 12: мобильная PWA, установка, вход и синхронизация
 
-**Файлы:** `apps/mobile/app/_layout.tsx`, `(auth)/login.tsx`, `(tabs)/_layout.tsx`, `(tabs)/settings.tsx`, `src/{ui,db,sync,auth,api,i18n}`.
+**Файлы:** `apps/web/public/pwa/*`, `apps/web/next.config.ts`, `app/m/{layout,page,login/page,settings/page}.tsx`, `src/pwa/{ui,db,sync,auth,api}`, `scripts/build-pwa.ts`.
 
-**Что делает:** вход, локальная зашифрованная база, движок синхронизации, очередь исходящих изменений, блокировка приложения.
+**Что делает:** устанавливаемое приложение (манифест и service worker), вход, зашифрованное локальное хранилище с PIN, движок синхронизации и очередь исходящих изменений, блокировка. Скрипт `build-pwa.ts` запускается после сборки Next.js и записывает `public/pwa/precache.json` из манифестов сборки, образ копирует `public/` уже после него.
 
 **Критерии приёмки:**
 
-1. Приложение запускается на эмуляторе Android и симуляторе iOS и показывает вход. (CI: mobile-e2e)
-2. Вход: имя устройства, шаг TOTP, ошибки на русском, токены в `expo-secure-store`, сессия восстанавливается после перезапуска. (CI: mobile-e2e)
-3. Локальная БД шифруется SQLCipher, ключ случаен и лежит в `expo-secure-store`; миграции локальной схемы сохраняют данные при обновлении приложения (тест на `node:sqlite`).
-4. Pull: страница применяется одной локальной транзакцией вместе с обновлением курсора, прерванный pull продолжается с сохранённого курсора, удалённые строки убираются.
-5. Очередь: мутации хранятся по порядку с клиентскими id, уходят пачками до 100, результат `applied` заменяет локальную запись серверной, `duplicate` ведёт себя так же, `rejected` помечает запись ошибкой с кодом и оставляет её для действия пользователя (повторить или отменить).
-6. Триггеры синхронизации: таймер 15 минут при открытом приложении, фоновая задача `expo-background-task` с минимальным интервалом 15 минут (по возможности системы), pull-to-refresh, возврат приложения на передний план при давности больше 15 минут, появление сети; одновременно идёт одна синхронизация (подставленные таймеры).
-7. Офлайн: баннер `offline`, очередь растёт до 500 мутаций, затем создание блокируется с понятным сообщением.
-8. Ошибка 401: одно прозрачное обновление токена; если обновление отклонено, локальные данные и токены стираются, показывается вход.
-9. Блокировка: после 5 минут в фоне приложение требует биометрию или код устройства (настройка, по умолчанию включена); выход стирает БД и токены.
-10. Тексты только из словаря `i18n`, литералов вне словаря нет (линтер).
-11. Подписи элементов, область нажатия не меньше 44 pt, крупный системный шрифт не обрезает текст. (ручной)
-12. Сборка профиля `preview` создаёт APK для Android и сборку для симулятора iOS. (ручной)
+1. Манифест: `name`, `short_name`, `start_url` равен `/m`, `scope` равен `/m/`, `display` равен `standalone`, `lang` равен `ru`, иконки 192, 512 и maskable 512, `apple-touch-icon`. Chromium не сообщает ошибок установки (`Page.getInstallabilityErrors` пуст). (CI: pwa-e2e)
+2. Service worker регистрируется с областью `/m/` только в защищённом контексте. После первой загрузки и перехода в офлайн открываются все экраны `/m`. Ответы `/api/*` и любые данные в Cache Storage не попадают (тест перечисляет ключи кэша). Новая версия сборки ставится в фоне, показывается сообщение «Доступна новая версия», применяется по кнопке, старый кэш удаляется. (CI: pwa-e2e)
+3. Локальное хранилище: IndexedDB, записи шифруются AES-GCM ключом данных, ключ данных защищён PIN (PBKDF2-SHA256, 600 000 итераций, соль 16 байт). Вне шифрования лежат только курсор синхронизации, время последней синхронизации и счётчик неверных PIN (тест ищет значения фикстуры в сыром содержимом базы). Миграции схемы IndexedDB сохраняют данные при обновлении версии (`fake-indexeddb`). (CI: pwa-unit)
+4. Вход: имя устройства определяется по браузеру, шаг TOTP, ошибки на русском, при первом входе устанавливается PIN (не короче 6 цифр, не из одинаковых и не из последовательных цифр), сессия переживает перезапуск приложения. (CI: pwa-e2e)
+5. Pull: страница применяется одной транзакцией IndexedDB вместе с обновлением курсора, прерванный pull продолжается с сохранённого курсора, удалённые строки убираются.
+6. Очередь: мутации хранятся зашифрованными по порядку с клиентскими id, уходят пачками до 100, результат `applied` заменяет локальную запись серверной, `duplicate` ведёт себя так же, `rejected` помечает запись ошибкой с кодом и оставляет её для действия пользователя (повторить или отменить).
+7. Триггеры синхронизации: таймер 15 минут при открытом приложении, возврат на экран при давности больше 15 минут, событие `online`, жест «потянуть вниз»; одновременно идёт одна синхронизация (подставленные таймеры). Отправки при закрытом приложении нет: очередь хранится зашифрованной и уходит при открытии и вводе PIN.
+8. Офлайн: баннер `offline`, очередь растёт до 500 мутаций, затем создание блокируется с понятным сообщением.
+9. Ошибки сессии: 401 `session_expired` открывает вход, локальные данные и очередь сохраняются и продолжают работать после входа того же пользователя, после входа другого пользователя стираются; 401 `session_revoked` стирает данные и очередь сразу.
+10. Блокировка и стирание: через 5 минут в фоне (`visibilitychange`) и по кнопке «Заблокировать» ключ данных удаляется из памяти и требуется PIN; 10 неверных PIN подряд стирают локальные данные; выход и «Забыл PIN» стирают IndexedDB, Cache Storage и данные регистрации service worker.
+11. Тексты только из словаря `i18n`, литералов вне словаря нет (линтер). На экране настроек `InstallHint` показывает кнопку установки в Chromium и инструкцию для iOS; приложение запрашивает `navigator.storage.persist()`, при отказе показывает предупреждение. (CI: pwa-e2e)
+12. Подписи элементов, область нажатия не меньше 44 на 44 css-пикселя, увеличенный шрифт браузера не обрезает текст. (ручной)
+13. Основные экраны открываются в Safari на iOS и в Chrome на Android, установка на главный экран проходит. (ручной)
 
-**Тесты:** `local-db`, `sync-pull`, `outbox`, `sync-triggers`, `session`, `lock` на `node:sqlite` и подставленных часах; сценарии Maestro `login.yaml`, `restart.yaml`.
+**Тесты:** `idb-vault`, `idb-migrations`, `sync-pull`, `outbox`, `sync-triggers`, `session`, `lock`, `manifest` на `fake-indexeddb` и подставленных часах; e2e Playwright `pwa-install`, `pwa-offline`, `pwa-update`, `pwa-login`.
 
-**Не делать:** экраны товаров, сделок, КП (слайсы 13 и 14), OTA-обновления, сертификатный пиннинг.
+**Не делать:** экраны товаров, сделок и КП (слайсы 13 и 14), Web Push, фоновую синхронизацию, нативные обёртки.
 
 ---
 
-### Слайс 13: мобильное приложение, поиск и карточка
+### Слайс 13: мобильная PWA, поиск и карточка
 
-**Файлы:** `app/(tabs)/search.tsx`, `app/product/[article].tsx`, `src/db/queries.ts`, `src/ui/{Card,ArticleLabel,StockBadge}.tsx`.
+**Файлы:** `app/m/search/page.tsx`, `app/m/product/page.tsx`, `src/pwa/db/{queries,search-index}.ts`, `src/pwa/ui/{ArticleLabel,VirtualList}.tsx`.
 
 **Что делает:** экран «Поиск и справка».
 
 **Критерии приёмки:**
 
-1. Поиск по локальной базе: по артикулу AUTEKO, по оригинальному номеру, по названию, с `normalizeKey` (пробелы, дефисы, регистр, кириллица и латиница), частичное совпадение. 20 000 товаров ищутся за 100 мс. (CI: mobile-unit)
-2. Результаты на `FlashList`: `ArticleLabel` (артикул AUTEKO крупно, оригинальный номер светло), модели ДВС, `StockBadge` с суммарным остатком; порядок: точное совпадение артикула, начало, вхождение.
-3. Карточка: применимость (модели, `все` показывается как «все модели»), суммарный остаток и остаток по партиям (номер партии, остаток, цена КП с НДС 22%), срок изготовления. Себестоимости на экране и в локальной схеме нет (тест схемы: нет колонок из списка скрытых полей).
+1. Поиск по индексу в памяти, который строится после ввода PIN: по артикулу AUTEKO, по оригинальному номеру, по названию, с `normalizeKey` (пробелы, дефисы, регистр, кириллица и латиница), частичное совпадение. 20 000 товаров ищутся за 100 мс. (CI: pwa-unit)
+2. Результаты в `VirtualList`: `ArticleLabel` (артикул AUTEKO крупно, оригинальный номер светло), модели ДВС, `StockBadge` с суммарным остатком; порядок: точное совпадение артикула, начало, вхождение.
+3. Карточка `/m/product?article=`: применимость (модели, `все` показывается как «все модели»), суммарный остаток и остаток по партиям (номер партии, остаток, цена КП с НДС), срок изготовления. Себестоимости нет ни на экране, ни в записях IndexedDB (тест проверяет ключи сохранённых записей).
 4. Цвета по порогам раздела 4, порог берётся из `/api/v1/me`, цвет всегда сопровождается числом.
 5. Архивные и «не поставляется» товары помечены.
-6. Пустые состояния: нет результатов; база пуста до первой синхронизации («Выполните синхронизацию»).
+6. Пустые состояния: нет результатов; хранилище пусто до первой синхронизации («Выполните синхронизацию»).
 7. Фильтр по модели ДВС кнопками.
 8. Работает офлайн целиком, показывает время последней синхронизации и предупреждение, если оно старше 24 часов.
-9. Прокрутка 100 и больше позиций без заметных задержек на среднем устройстве. (ручной)
+9. Прокрутка 100 и больше позиций без заметных задержек на среднем телефоне. (ручной)
 
-**Тесты:** `search-queries` (таблицы и замер на `node:sqlite`), `schema-no-cost`, `format`, сценарий Maestro `search.yaml`.
+**Тесты:** `search-index` (таблицы и замер), `records-no-cost`, `format`, e2e Playwright `pwa-search`.
 
 **Не делать:** сканер штрихкодов, фото, избранное.
 
 ---
 
-### Слайс 14: мобильное приложение, сделки и КП
+### Слайс 14: мобильная PWA, сделки и КП
 
-**Файлы:** `app/(tabs)/deals.tsx`, `app/deal/*`, `app/(tabs)/quotes.tsx`, `app/quote/*`, `src/sync/outbox.ts` (расширение).
+**Файлы:** `app/m/deals/page.tsx`, `app/m/deals/new/page.tsx`, `app/m/deal/page.tsx`, `app/m/quotes/page.tsx`, `app/m/quotes/new/page.tsx`, `app/m/quote/page.tsx`, `src/pwa/sync/outbox.ts` (расширение).
 
 **Что делает:** экраны «Сделки» и «КП».
 
@@ -1326,14 +1332,14 @@ CONTRACT GAP
 2. Создание сделки: клиент (поиск), товар по артикулу AUTEKO только с остатком больше 0 по локальным данным, партия (по умолчанию самая старая с остатком), количество не больше локального остатка, цена по умолчанию цена КП, изменяемая; запись сразу в очередь и в список, после синхронизации появляется номер `R-xxx`.
 3. Проверка на устройстве использует общие валидаторы, ошибки показываются у полей; нехватка остатка на сервере переводит сделку в состояние «отклонена» с текстом `insufficient_stock` и действиями «изменить» и «отменить».
 4. Изменение своей сделки в статусах `new` и `confirmed` с `base_version`; при конфликте показывается серверная версия и предлагается применить изменения заново.
-5. Статусы оплаты и отгрузки: даты предоплаты, факт. поставки, факт. оплаты показываются, `sales` их не меняет.
-6. КП: список, создание (клиент, позиции из поиска, количество, цена), изменение черновика, смена статуса `draft` в `sent`; PDF скачивается с сервера при сети и открывается через системное меню «Поделиться», без сети показывается сообщение.
-7. Все сценарии создания работают офлайн и доходят до сервера при появлении сети. (CI: mobile-e2e)
-8. Данные себестоимости нигде не отображаются: фикстура с различимыми значениями себестоимости, поиск этих значений в интерфейсе и локальной БД даёт 0 совпадений. (CI: mobile-e2e)
+5. Даты предоплаты, фактической поставки и фактической оплаты показываются, `sales` их не меняет.
+6. КП: список, создание (клиент, позиции из поиска, количество, цена), изменение черновика, смена статуса `draft` в `sent`; PDF скачивается с сервера при сети и передаётся через Web Share API с файлом там, где он поддерживается, иначе скачивается; без сети показывается сообщение.
+7. Все сценарии создания работают офлайн и доходят до сервера при появлении сети и открытом приложении. (CI: pwa-e2e)
+8. Данные себестоимости нигде не отображаются: фикстура с различимыми значениями себестоимости, поиск этих значений в интерфейсе и в содержимом IndexedDB после расшифровки даёт 0 совпадений. (CI: pwa-e2e)
 
-**Тесты:** `deal-create`, `deal-conflict`, `quote-create`, `overdue-view`; сценарии Maestro `deal-offline.yaml`, `quote.yaml`.
+**Тесты:** `deal-create`, `deal-conflict`, `quote-create`, `overdue-view`; e2e Playwright `pwa-deal-offline`, `pwa-quote`.
 
-**Не делать:** создание клиентов на телефоне, смену статусов оплаты, создание сделок из КП (делает web).
+**Не делать:** создание клиентов в PWA, смену статусов оплаты, создание сделок из КП (делает web).
 
 ---
 
@@ -1347,16 +1353,17 @@ CONTRACT GAP
 
 1. `DEPLOY_MODE` обязателен (`internal` или `public`), иное значение завершает процесс с понятным сообщением.
 2. Режим `public` без любого из `APP_URL` с `https`, `TRUST_PROXY_HOPS`, `APP_ENCRYPTION_KEY`, `BACKUP_ENCRYPTION_KEY` не стартует.
-3. В режиме `public` вход без настроенного TOTP ведёт на подключение второго фактора и блокирует остальные страницы, мобильный вход без TOTP даёт `totp_enrollment_required`. В режиме `internal` второй фактор необязателен и включается пользователем.
+3. В режиме `public` вход без настроенного TOTP ведёт на подключение второго фактора и блокирует остальные страницы, вход из PWA без TOTP даёт `totp_enrollment_required`. В режиме `internal` второй фактор необязателен и включается пользователем.
 4. `ALLOWED_CIDRS` (IPv4 и IPv6): клиент вне списка получает 403 `ip_not_allowed` на всё, кроме `/api/health/live`; `X-Forwarded-For` учитывается только при `TRUST_PROXY_HOPS` больше 0, подделанный заголовок при 0 игнорируется.
 5. Ограничение частоты: вход 5 попыток за 15 минут на учётную запись и 20 на IP, API 300 запросов в минуту на пользователя, ответ 429 с `Retry-After` (подставленные часы).
 6. CSP с одноразовым значением `nonce` в `script-src`, без `unsafe-inline` для скриптов и без `unsafe-eval` в production, e2e не находит нарушений.
-7. CSRF: изменяющий запрос route handler с cookie-сессией и чужим `Origin` получает 403, при отсутствии `Origin` и `Sec-Fetch-Site: cross-site` тоже 403, запросы с `Bearer` не проверяются.
+7. CSRF: изменяющий запрос route handler с cookie-сессией и чужим `Origin` получает 403, при отсутствии `Origin` и `Sec-Fetch-Site: cross-site` тоже 403, изменяющий запрос к `/api/v1` без заголовка `X-Auteko-Client: pwa` получает 403.
 8. Все заголовки раздела 18 есть на ответе страницы, API, 404 и статики.
 9. Cookie сессии: атрибуты раздела 18, префикс `__Host-` при `https`, замена сессии при входе.
 10. Слабые секреты отклоняются при старте: `APP_ENCRYPTION_KEY` не 32 байта в base64, `DATABASE_URL` с ролью суперпользователя.
 11. `deploy/Caddyfile.public` (автоматический TLS, HSTS, ограничения запросов, скрытый заголовок `Server`) и `Caddyfile.internal` (внутренний TLS или HTTP) проходят `caddy validate`, `compose.yaml` не публикует порт БД наружу, профили `internal` и `public` поднимаются. (CI: release)
 12. Проверка по OWASP ASVS уровня 2 для разделов V2, V3, V4, V5, V7, V8, V13, V14 проведена, результат записан в `docs/OPERATIONS.md`. (ручной)
+13. При схеме `http` в `APP_URL` раздел `/m` показывает страницу «Нужен защищённый адрес», service worker не регистрируется, web-панель работает.
 
 **Тесты:** `config`, `client-ip`, `rate-limit`, `csrf`, `headers`, `mode-public`, e2e `security` (заголовки, CSP, CSRF, лимит тела).
 
@@ -1407,7 +1414,7 @@ CONTRACT GAP
 **Что делает:**
 
 - README: описание, возможности, быстрый старт для разработчика, таблица всех переменных окружения, режимы `internal` и `public`, раздел «Безопасность» (модель угроз простыми словами, настройка за прокси), резервная копия и восстановление, обновление, разработка, тесты, вклад. Структура по руководствам из раздела 11.
-- `docs/OPERATIONS.md`: установка на VPS (Docker Compose), настройка Caddy, TLS, создание первого администратора, таймер резервных копий, копирование копий во внешнее хранилище, восстановление, обновление, сборка и раздача мобильного приложения (EAS, TestFlight, внутренний Android-канал), результат проверки ASVS.
+- `docs/OPERATIONS.md`: установка на VPS (Docker Compose), настройка Caddy, TLS, создание первого администратора, таймер резервных копий, копирование копий во внешнее хранилище, восстановление, обновление, установка PWA на телефоны (Android, iOS), внутренний TLS и корневой сертификат для режима `internal`, результат проверки ASVS.
 - CONTRIBUTING: как запустить `gate`, формат коммитов, как добавить ключ словаря, как добавить тест. SECURITY: как сообщить об уязвимости (приватные отчёты GitHub), поддерживаемые версии. CHANGELOG: формат Keep a Changelog, версии SemVer, каждая миграция схемы отмечена и сопровождена советом сделать копию. LICENSE: MIT, правообладатель владелец репозитория.
 
 **Критерии приёмки:**
@@ -1431,7 +1438,7 @@ CONTRACT GAP
 
 **Критерии приёмки:**
 
-1. Пока в таблице параметров один язык (`ru`), в шапке `Локализация: отложена` в шапке `tech.md`, словари `packages/shared/src/i18n/ru.ts`, `apps/web/src/i18n/ru.ts`, `apps/mobile/src/i18n/ru.ts` содержат все видимые строки, функция перевода принимает язык параметром. (CI: gate)
+1. Пока в таблице параметров один язык (`ru`), в шапке `tech.md` записано `Локализация: отложена`, словари `packages/shared/src/i18n/ru.ts`, `apps/web/src/i18n/ru.ts` содержат все видимые строки, функция перевода принимает язык параметром. (CI: gate)
 
 **Не делать:** переводы, переключатель языка, шрифты других алфавитов до решения владельца.
 
@@ -1441,7 +1448,7 @@ CONTRACT GAP
 
 Слайс не меняет код продукта, кроме номера версии.
 
-**Что собрать:** конвейер релиза по разделу 20, `Dockerfile` (многоэтапная сборка, пользователь не root, `pg_dump` и `pg_restore` в образе), `compose.yaml` с профилями, инструкция деплоя и отката, профили сборки мобильного приложения (`eas.json`: `preview`, `production`), релиз-кандидат и приёмочный прогон.
+**Что собрать:** конвейер релиза по разделу 20, `Dockerfile` (многоэтапная сборка, пользователь не root, `pg_dump` и `pg_restore` в образе), `compose.yaml` с профилями, инструкция деплоя и отката, релиз-кандидат и приёмочный прогон.
 
 **Критерии приёмки:**
 
@@ -1449,7 +1456,7 @@ CONTRACT GAP
 2. Релиз по тегу создаёт образ с SBOM и provenance, архив, контрольные суммы и текст релиза из CHANGELOG. (CI: release)
 3. Версия в манифесте, верхняя запись CHANGELOG и тег совпадают, иначе релиз падает. (CI: release)
 4. Образ сканируется на уязвимости (высокие и критические блокируют релиз), запускается не от root, отвечает на `ready`, данные в томе переживают перезапуск и обновление образа. (CI: release)
-5. Мобильное приложение собрано для Android (APK или AAB) и iOS (TestFlight или внутренняя раздача), установлено на реальные устройства, основной сценарий пройден в обоих режимах (с сетью и без). (ручной)
+5. PWA установлена на реальные устройства (Android с Chrome и iOS с Safari), основной сценарий пройден с сетью и без неё, обновление версии PWA доставляется на устройства. (ручной)
 6. Обновление с предыдущего релиза проверено на копии реальных данных. (ручной)
 7. Релиз-кандидат отработал 14 дней в целевом окружении без блокирующих дефектов. (ручной)
 8. Ревью безопасности по таблице раздела 18 проведено, `audit` и `secrets` чистые. (ручной)
@@ -1528,7 +1535,7 @@ CONTRACT GAP
 12. `criteria` не называет критериев без тестов, покрытие и мутации не упали.
 13. Исключения из покрытия обоснованы комментарием.
 14. Остаток и деньги: списание остатка идёт в транзакции под блокировкой строки партии, деньги считаются только через `money.ts`, себестоимость только через `calc.ts`.
-15. Мобильное приложение: мутации идемпотентны, локальная схема без скрытых полей, данные стираются при выходе и при отзыве сессии.
+15. PWA: мутации идемпотентны, локальные данные зашифрованы и без полей себестоимости, стираются при выходе и при отзыве сессии.
 
 Формат находки: `blocker|follow-up`, `файл:строка`, что сломано, почему.
 
@@ -1547,7 +1554,7 @@ CONTRACT GAP
 - Каждая видимая пользователю строка берётся из словаря: тексты, подписи элементов управления, заголовки документов, тексты пустых состояний, ошибки валидации, названия статусов и ролей. Литералов в коде и разметке нет. Общие ключи (`error.*`, `status.*`, `role.*`) лежат в `packages/shared/src/i18n/ru.ts`, ключи экранов в `apps/web/src/i18n/ru.ts` и `apps/mobile/src/i18n/ru.ts`.
 - Словарь типизирован: набор ключей проверяет компилятор или тест. Плейсхолдеры `{name}`. Ключ ошибки валидации строится как `error.<код>` (раздел 8).
 - Функция перевода получает язык параметром. Язык запроса определяет вход слоя интерфейса и передаёт дальше, глобального «текущего языка» нет.
-- Числа и даты форматирует `Intl` с `ru-RU`: деньги `1 234,50 ₽`, дата `11.10.2026`. Момент времени выводится в `APP_TIMEZONE` с подписью зоны, календарная дата (`date`) выводится как есть. Одна функция форматирования на сервере и в мобильном приложении.
+- Числа и даты форматирует `Intl` с `ru-RU`: деньги `1 234,50 ₽`, дата `11.10.2026`. Момент времени выводится в `APP_TIMEZONE` с подписью зоны, календарная дата (`date`) выводится как есть. Одна функция форматирования на сервере и в PWA.
 - Данные пользователя не переводятся. Язык документа указывается атрибутом `lang="ru"`.
 
 Документы:
@@ -1560,13 +1567,13 @@ CONTRACT GAP
 
 ## 18. Безопасность
 
-Модель угроз. Защищаем: коммерческую тайну (закупочные цены, себестоимость, маржа, список контрагентов с ИНН), учётные записи сотрудников, целостность остатков и сделок, доступность данных (копии). Атакуют: внешний нарушитель из интернета (режим `public`) и внутренний (сотрудник с ролью `sales`, который пытается увидеть себестоимость, или тот, кто потерял телефон), а также цепочка поставки (зависимости, действия CI). Поверхности: формы и API, загрузка файлов, мобильное приложение и его локальная БД, резервные копии, зависимости, конвейер релиза. Вне модели: физический доступ к серверу и компрометация ОС хоста, шифрование диска хоста (рекомендуется оператору), отказ в обслуживании на сетевом уровне (решается провайдером и прокси).
+Модель угроз. Защищаем: коммерческую тайну (закупочные цены, себестоимость, маржа, список контрагентов с ИНН), учётные записи сотрудников, целостность остатков и сделок, доступность данных (копии). Атакуют: внешний нарушитель из интернета (режим `public`) и внутренний (сотрудник с ролью `sales`, который пытается увидеть себестоимость, или тот, кто потерял телефон), а также цепочка поставки (зависимости, действия CI). Поверхности: формы и API, загрузка файлов, PWA и её локальное хранилище, резервные копии, зависимости, конвейер релиза. Вне модели: физический доступ к серверу и компрометация ОС хоста, шифрование диска хоста (рекомендуется оператору), отказ в обслуживании на сетевом уровне (решается провайдером и прокси).
 
 Режимы работы. Набор мер один, различаются обязательные настройки (проверяются при старте, слайс H):
 
 | параметр                 | `internal`                                      | `public`                                         |
 | ------------------------ | ----------------------------------------------- | ------------------------------------------------ |
-| TLS                      | внутренний TLS Caddy или HTTP в доверенной сети | только HTTPS, HSTS на прокси                     |
+| TLS                      | внутренний TLS Caddy (обязателен для PWA; на HTTP работает только web-панель) | только HTTPS, HSTS на прокси                     |
 | второй фактор            | необязателен, включает пользователь             | обязателен для всех ролей                        |
 | `ALLOWED_CIDRS`          | рекомендуется (офис, VPN)                       | необязателен                                     |
 | `TRUST_PROXY_HOPS`       | 0 или 1                                         | обязателен (1 при одном прокси)                  |
@@ -1586,11 +1593,11 @@ CONTRACT GAP
 | Clickjacking, MIME sniffing, утечка Referer  | заголовки ниже                                                                                                               | S0A.14, SH.8                       |
 | Большие запросы и исчерпание ресурсов        | лимит тела, лимиты полей раздела 8, лимиты импорта, таймауты, ограничение частоты                                            | SH.5, SE.16, S7.5                  |
 | Перебор паролей, подбор кодов                | блокировка учётной записи, лимит по IP, одинаковый ответ на неверный логин и пароль, TOTP с защитой от повтора               | S1.2, S1.4, S1.6, SH.5             |
-| Кража сессии или токена                      | непрозрачные токены, в БД только хеши, ротация и обнаружение повторного использования refresh, отзыв сессий                  | S1.5, S11.1, S11.2                 |
+| Кража сессии                                 | непрозрачные идентификаторы, в БД только хеши, сроки простоя и абсолютный срок, отзыв сессий администратором и пользователем | S1.5, S11.1, S11.2                 |
 | Доступ без права                             | проверка роли на сервере в каждом обработчике, матрица прав в одном месте                                                    | S1.9, S0A.12                       |
-| Утечка себестоимости менеджеру               | `toPublicBatch`, поля скрыты в HTML, JSON, выгрузках, PDF, синхронизации; локальная схема мобильного клиента без этих колонок | S5.5, S8.8, S11.4, S13.3, S14.8    |
+| Утечка себестоимости менеджеру               | `toPublicBatch`, поля скрыты в HTML, JSON, выгрузках, PDF, синхронизации; в IndexedDB этих полей нет ни у одной роли        | S5.5, S8.8, S11.4, S13.3, S14.8    |
 | Утечка внутренностей в ошибках и журнале     | страницы ошибок без стека и путей, журнал без секретов и данных клиентов                                                     | SE.2, SE.5                         |
-| Потеря или кража устройства                  | SQLCipher, блокировка по биометрии, стирание данных при выходе и при отзыве сессии, токены в `expo-secure-store`             | S12.3, S12.8, S12.9                |
+| Потеря или кража устройства                  | шифрование хранилища ключом от PIN (PBKDF2), блокировка через 5 минут, стирание после 10 неверных PIN, при выходе и при отзыве сессии | S12.3, S12.9, S12.10               |
 | Кража резервной копии                        | шифрование AES-256-GCM, ключ вне каталога копий, доступ к копиям только `admin`                                              | SE.6, SE.9                         |
 | Потеря данных                                | ежедневные копии, проверка, хранение по схеме, восстановление с копией `pre-restore`                                         | SE.6, SE.7, SE.8, SE.10, SE.11     |
 | Вредоносный файл импорта                     | лимиты размера и строк, защита от распаковки в память, формулы не вычисляются, экранирование в выгрузках                     | S7.5, S7.6, S5.6                   |
@@ -1602,7 +1609,7 @@ CONTRACT GAP
 Заголовки ответа (приложение выставляет их на ответы фреймворка, статику может отдавать прокси):
 
 ```
-Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-<random>'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-<random>'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self'; manifest-src 'self'
 X-Content-Type-Options: nosniff
 Referrer-Policy: no-referrer
 X-Frame-Options: DENY
@@ -1611,7 +1618,7 @@ Cross-Origin-Resource-Policy: same-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 ```
 
-`nonce` создаётся на каждый запрос в `proxy.ts`. `'unsafe-inline'` в `style-src` допустим только если фреймворк выводит атрибуты `style` в разметке, причина записывается комментарием в конфиге. `Strict-Transport-Security: max-age=31536000; includeSubDomains` добавляет прокси в режиме `public`, в режиме `internal` по схеме адреса. API v1 и ответы с данными дополнительно получают `Cache-Control: no-store`.
+`nonce` создаётся на каждый запрос в `proxy.ts`. `'unsafe-inline'` в `style-src` допустим только если фреймворк выводит атрибуты `style` в разметке, причина записывается комментарием в конфиге. `Strict-Transport-Security: max-age=31536000; includeSubDomains` добавляет прокси в режиме `public`, в режиме `internal` по схеме адреса. API v1 и ответы с данными дополнительно получают `Cache-Control: no-store`. Файл `/pwa/sw.js` отдаётся с `Cache-Control: no-cache` и `Service-Worker-Allowed: /m/`.
 
 Cookie сессии web: `path=/`, без `Max-Age` (срок задаёт сервер, раздел «Аутентификация»), `SameSite=Lax`, `HttpOnly`, `Secure` при схеме `https` (на `http` в локальной сети браузер cookie с `Secure` не сохранит), имя `__Host-auteko_session` при `https` и `auteko_session` при `http`. Значение: случайные 256 бит в base64url. Атрибуты собирает одна функция.
 
@@ -1625,10 +1632,10 @@ Cookie сессии web: `path=/`, без `Max-Age` (срок задаёт се�
 - Способ входа: email и пароль, второй фактор TOTP (RFC 6238, SHA-1, 6 цифр, шаг 30 секунд, допускается сдвиг на один шаг, использованный код повторно не принимается). Коды восстановления: 10 штук, хранятся хешами, одноразовые. Секрет TOTP шифруется AES-256-GCM ключом `APP_ENCRYPTION_KEY`.
 - Пароли хранятся только как хеши `argon2id` (память 64 МБ, 3 прохода, параллелизм 1, соль 16 байт), пароль от 12 до 128 знаков, проверка по списку частых паролей `server/security/common-passwords.txt` (1000 строк), пароль не равен email. Хеши пересчитываются при входе, если параметры устарели.
 - Сессия web: идентификатор случайный, 256 бит, в БД только SHA-256, абсолютный срок 12 часов, простой 2 часа, выход отзывает сессию на сервере, смена пароля и деактивация отзывают сессии, при входе выдаётся новая сессия.
-- Сессия мобильного клиента: `access_token` 15 минут, `refresh_token` 30 дней с ротацией при каждом использовании, абсолютный срок 90 дней, повтор использованного `refresh_token` отзывает всю цепочку (`family_id`).
+- Сессия клиента PWA (`kind` равен `pwa`): идентификатор случайный, 256 бит, в БД только SHA-256, простой 30 дней со скользящим продлением, абсолютный срок 90 дней, cookie `HttpOnly`, `SameSite=Lax`, `Secure` при `https`. Отозванная сессия и деактивированный пользователь получают 401 `session_revoked`, истёкшая 401 `session_expired`. Изменяющие запросы требуют заголовок `X-Auteko-Client: pwa` и проверку `Origin`.
 - Перебор: 5 неудач подряд блокируют учётную запись на 15 минут, лимиты по IP и по запросам раздела слайса H, одинаковый ответ на неверный логин и неверный пароль, фиктивная проверка хеша для неизвестного email.
 - Права: матрица «роль, действие, сущность» это замороженный контракт раздела 4. Проверка прав идёт на сервере в каждом обработчике, скрытая кнопка защитой не считается. Роль `sales` не получает поля себестоимости ни в одном канале.
-- Мобильное устройство: локальная БД шифруется SQLCipher, ключ в `expo-secure-store`, блокировка биометрией или кодом устройства через 5 минут в фоне, выход и отзыв сессии стирают данные, пиннинга сертификата нет (сознательно, чтобы смена сертификата не ломала клиентов).
+- Телефон и PWA: локальные записи шифруются AES-GCM ключом данных, ключ данных защищён PIN (не короче 6 цифр, PBKDF2-SHA256, 600 000 итераций, соль 16 байт), через 5 минут в фоне ключ удаляется из памяти, 10 неверных PIN подряд стирают данные, выход стирает IndexedDB, Cache Storage и регистрацию service worker. Себестоимость в канал PWA не попадает ни у одной роли. Service worker не кэширует `/api/*`. Остаточный риск: скрипт на странице видит ключ, пока приложение разблокировано, поэтому строгий CSP это обязательная мера. Пиннинга сертификата нет.
 - Секреты приложения (`APP_ENCRYPTION_KEY`, `BACKUP_ENCRYPTION_KEY`, пароли БД): только из окружения или хранилища секретов платформы, в репозитории, журнале и ответах их нет. Ключи хранятся отдельно от каталога копий.
 - Журнал аудита: вход и выход, неудачи, блокировка, смена пароля и 2FA, действия администратора, создание, изменение и удаление данных, резервные копии и восстановление, с временем UTC и идентификатором субъекта. Изменение и удаление записей приложением невозможны (права БД).
 
@@ -1689,12 +1696,13 @@ Cookie сессии web: `path=/`, без `Max-Age` (срок задаёт се�
 - Клавиатура: `e2e` проходит основной сценарий только клавишами Tab, Enter, Space.
 - Ревью смотрит то, что axe не ловит: осмысленность подписей, порядок фокуса, состояния без цвета.
 
-### Мобильное приложение
+### Мобильная PWA
 
-- У каждого интерактивного элемента есть подпись для VoiceOver и TalkBack, область нажатия не меньше 44 на 44 pt.
-- Крупный системный шрифт не обрезает текст и не ломает списки. Контраст текста 4.5:1.
+- У каждого интерактивного элемента есть подпись для VoiceOver и TalkBack, область нажатия не меньше 44 на 44 css-пикселя.
+- Увеличенный размер шрифта браузера и масштаб до 200% не обрезают текст и не ломают списки. Контраст текста 4.5:1.
 - Остаток и статус передаются цветом и текстом (`StockBadge`), просрочка словом и значком.
 - Основной сценарий (поиск, карточка, создание сделки) проходится с включённым экранным диктором вручную перед релизом.
+
 ---
 
 ## 20. CI/CD и релиз
@@ -1713,16 +1721,16 @@ CI это обязательный барьер: слайс закрыт, ког
 | `load`     | нагрузочные и ресурсные тесты слайса E | бюджет производительности, параллелизм                                            |
 | `links`    | проверка ссылок документов             | битые ссылки                                                                      |
 
-Дополнительные job'ы проекта: `codeql` (анализ кода GitHub, на pull request и по расписанию), `mobile-unit` (логика мобильного приложения и замер поиска), `mobile-e2e` (сценарии Maestro на эмуляторе Android, ночью и по ручному запуску), `mobile-build` (профиль EAS `preview`, только по ручному запуску). Проверка `check-workflows` входит в `gate`. Job'ам с БД CI даёт сервис PostgreSQL 18.
+Дополнительные job'ы проекта: `codeql` (анализ кода GitHub, на pull request и по расписанию), `pwa-unit` (логика PWA и замер поиска), `pwa-e2e` (Playwright в мобильном профиле, Chromium и WebKit, с service worker и офлайном, на pull request). Проверка `check-workflows` входит в `gate`. Job'ам с БД CI даёт сервис PostgreSQL 18.
 
-Защита основной ветки (один раз, вручную): обязательные проверки `gate`, `e2e`, `audit`, `secrets`, `mutation`, `codeql`, `mobile-unit`; слияние через pull request, даже если разработчик один; force push запрещён.
+Защита основной ветки (один раз, вручную): обязательные проверки `gate`, `e2e`, `audit`, `secrets`, `mutation`, `codeql`, `pwa-unit`, `pwa-e2e`; слияние через pull request, даже если разработчик один; force push запрещён.
 
 Релиз по тегу `v*.*.*`:
 
 1. `gate` и `e2e`.
 2. Проверка: версия в манифесте, верхняя запись CHANGELOG и тег совпадают.
 3. `build`, архив артефакта и файл контрольных сумм.
-4. Образ сканируется на уязвимости (высокие и критические блокируют релиз), затем публикуется в реестр с SBOM и provenance, теги версии и `latest`. Мобильные сборки делает отдельный ручной job по профилю EAS `production`, публикацию в TestFlight и магазинах выполняет владелец.
+4. Образ сканируется на уязвимости (высокие и критические блокируют релиз), затем публикуется в реестр с SBOM и provenance, теги версии и `latest`.
 5. Публикация релиза с артефактами, суммами и текстом версии из CHANGELOG.
 
 Права на запись (релизы, пакеты) есть только у job'а релиза.

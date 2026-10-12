@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data: product }, { status: 201 })
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Некорректные данные', details: err.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Некорректные данные', details: err.issues }, { status: 400 })
     }
     console.error('POST /api/products error:', err)
     return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 })

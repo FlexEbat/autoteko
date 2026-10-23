@@ -1,0 +1,15 @@
+export const ruWeb = {
+  'app.name': 'AUTEKO',
+  'app.skip_to_content': 'Перейти к содержимому',
+  'home.title': 'AUTEKO: учёт запчастей',
+  'home.heading': 'AUTEKO',
+  'home.lead': 'Система учёта запчастей для дизельных двигателей.',
+  'notfound.title': 'Страница не найдена',
+  'notfound.heading': 'Страница не найдена',
+  'notfound.text': 'Проверьте адрес или вернитесь на главную.',
+  'notfound.home': 'На главную',
+  'crash.title': 'Ошибка',
+  'crash.heading': 'Что-то пошло не так',
+  'crash.text': 'Попробуйте обновить страницу. Если ошибка повторится, сообщите администратору.',
+  'crash.retry': 'Повторить',
+} as const

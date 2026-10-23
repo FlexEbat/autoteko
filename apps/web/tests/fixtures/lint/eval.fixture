@@ -1,0 +1,1 @@
+export const f = (code: string) => eval(code)

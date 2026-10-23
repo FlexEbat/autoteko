@@ -1,6 +1,7 @@
 # AUTEKO — Информационная система
 
 ## Стек
+
 - **Next.js 14** (App Router)
 - **PostgreSQL** (база данных)
 - **TypeScript**
@@ -9,17 +10,20 @@
 ## Быстрый старт
 
 ### 1. Установка зависимостей
+
 ```bash
 npm install
 ```
 
 ### 2. Настройка окружения
+
 ```bash
 cp .env.example .env.local
 # Заполни DATABASE_URL и JWT_SECRET
 ```
 
 ### 3. Создание базы данных
+
 ```bash
 # Подключись к PostgreSQL и выполни:
 psql -U postgres -c "CREATE DATABASE auteko_db;"
@@ -31,11 +35,13 @@ psql -U auteko_user -d auteko_db -f auteko_schema.sql
 ```
 
 ### 4. Создание первого пользователя
+
 ```bash
 node scripts/create-user.js admin@auteko.ru yourpassword "Имя Фамилия"
 ```
 
 ### 5. Запуск
+
 ```bash
 npm run dev        # разработка → http://localhost:3000
 npm run build      # сборка для продакшена

@@ -1,0 +1,4 @@
+import { sql } from './sql.ts'
+export async function f(db: { query(q: unknown): unknown }, id: string) {
+  return db.query(sql`select * from t where id = ${id}`)
+}

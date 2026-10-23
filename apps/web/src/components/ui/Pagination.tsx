@@ -5,6 +5,7 @@ export interface PaginationProps {
   limit: number
   total: number
   hrefFor: (page: number) => string
+  labels: { nav: string; previous: string; next: string }
 }
 
 // Shows the first, last and nearby pages as numbers.
@@ -20,12 +21,21 @@ function visiblePages(page: number, pages: number): (number | null)[] {
   return result
 }
 
-export function Pagination({ page, limit, total, hrefFor }: PaginationProps): ReactNode {
+const LINK_CLASS = 'inline-flex min-h-9 min-w-9 items-center justify-center rounded border border-line px-2'
+
+export function Pagination({ page, limit, total, hrefFor, labels }: PaginationProps): ReactNode {
   const pages = Math.max(1, Math.ceil(total / limit))
   if (pages === 1) return null
   return (
-    <nav>
+    <nav aria-label={labels.nav}>
       <ul className="flex flex-wrap items-center gap-1">
+        {page > 1 ? (
+          <li>
+            <a href={hrefFor(page - 1)} className={LINK_CLASS}>
+              {labels.previous}
+            </a>
+          </li>
+        ) : null}
         {visiblePages(page, pages).map((n, index) => (
           <li key={n ?? `gap-${index}`}>
             {n === null ? (
@@ -47,6 +57,13 @@ export function Pagination({ page, limit, total, hrefFor }: PaginationProps): Re
             )}
           </li>
         ))}
+        {page < pages ? (
+          <li>
+            <a href={hrefFor(page + 1)} className={LINK_CLASS}>
+              {labels.next}
+            </a>
+          </li>
+        ) : null}
       </ul>
     </nav>
   )

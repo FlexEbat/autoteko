@@ -20,17 +20,34 @@
     "types": "npm run types --workspaces --if-present",
     "test": "vitest run",
     "db:migrate": "npm run db:migrate -w apps/web",
-    "gate": "npm run fmt && npm run lint && npm run types && npm run test"
+    "gate": "npm run fmt && npm run lint && npm run types && npm run docs && npm run criteria && npm run workflows && npm run cov",
+    "cov": "vitest run --coverage",
+    "docs": "node scripts/check-docs.ts",
+    "criteria": "node scripts/check-criteria.ts",
+    "commit": "node scripts/check-commit-msg.ts",
+    "workflows": "node scripts/check-workflows.ts",
+    "e2e": "playwright test",
+    "mut": "stryker run",
+    "audit": "npm audit --omit=dev --audit-level=high",
+    "secrets": "gitleaks detect --redact",
+    "hooks": "lefthook install",
+    "gate-full": "npm run gate && npm run build && npm run e2e"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "26.6.5",
     "@types/pg": "8.11.10",
+    "@vitest/coverage-v8": "4.1.12",
     "eslint": "10.12.0",
     "fast-check": "4.0.0",
+    "lefthook": "2.2.2",
     "prettier": "3.6.2",
     "prettier-plugin-tailwindcss": "0.6.14",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.0",
-    "vitest": "5.0.3"
+    "vitest": "4.1.12"
   }
 }

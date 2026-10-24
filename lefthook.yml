@@ -1,0 +1,16 @@
+pre-commit:
+  commands:
+    fmt:
+      glob: '*.{ts,tsx,js,mjs,json,md,yml,yaml,css}'
+      run: npx prettier --check {staged_files}
+    lint:
+      glob: '*.{ts,tsx,js,mjs}'
+      run: npx eslint {staged_files}
+commit-msg:
+  commands:
+    message:
+      run: node scripts/check-commit-msg.ts {1}
+pre-push:
+  commands:
+    gate:
+      run: npm run gate

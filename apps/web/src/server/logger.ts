@@ -1,4 +1,4 @@
-import { pino, type Logger } from 'pino'
+import { pino, type DestinationStream, type Logger } from 'pino'
 
 // Structured JSON to stdout. Secrets never reach the log: these paths are removed.
 const REDACTED_PATHS = [
@@ -14,6 +14,6 @@ const REDACTED_PATHS = [
   'req.headers.cookie',
 ]
 
-export function createLogger(level: string): Logger {
-  return pino({ level, redact: { paths: REDACTED_PATHS, censor: '[redacted]' } })
+export function createLogger(level: string, destination?: DestinationStream): Logger {
+  return pino({ level, redact: { paths: REDACTED_PATHS, censor: '[redacted]' } }, destination)
 }

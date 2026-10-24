@@ -93,6 +93,13 @@ export async function resetDb(db: Db): Promise<void> {
   }
 }
 
+// Drops and creates a named database, for long-lived instances such as the e2e servers.
+export async function recreateDatabase(name: string): Promise<void> {
+  if (!name.endsWith('_test')) throw new Error('only databases named *_test may be recreated')
+  await adminStatement(`drop database if exists ${name} with (force)`)
+  await adminStatement(`create database ${name}`)
+}
+
 // A database with no tables, for tests of the migration runner itself.
 export async function createEmptyTestDb(): Promise<{
   db: ReturnType<typeof openPool>

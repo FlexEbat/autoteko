@@ -23,9 +23,12 @@ function brand(query: SqlQuery): SqlQuery {
 // Tagged template: every interpolated value becomes a numbered parameter.
 // A fragment built by sql or ident is spliced in, with its parameters renumbered.
 export function sql(strings: TemplateStringsArray, ...values: unknown[]): SqlQuery {
-  let text = strings[0] ?? ''
+  let text = ''
   const params: unknown[] = []
-  values.forEach((value, index) => {
+  strings.forEach((chunk, index) => {
+    text += chunk
+    if (index >= values.length) return
+    const value = values[index]
     if (isSqlQuery(value)) {
       const offset = params.length
       text += value.text.replace(/\$(\d+)/g, (_, n: string) => `$${Number(n) + offset}`)
@@ -34,7 +37,6 @@ export function sql(strings: TemplateStringsArray, ...values: unknown[]): SqlQue
       params.push(value)
       text += `$${params.length}`
     }
-    text += strings[index + 1] ?? ''
   })
   return brand({ text, values: params })
 }

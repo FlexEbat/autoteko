@@ -8,8 +8,8 @@ export function today(timeZone: string, now: Date = new Date()): IsoDate {
     month: '2-digit',
     day: '2-digit',
   }).formatToParts(now)
-  const pick = (type: string): string => parts.find((part) => part.type === type)?.value ?? ''
-  return `${pick('year')}-${pick('month')}-${pick('day')}`
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${byType['year']}-${byType['month']}-${byType['day']}`
 }
 
 // A deal is overdue when the deadline is before today, nothing was delivered

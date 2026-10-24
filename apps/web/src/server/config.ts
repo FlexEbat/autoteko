@@ -19,7 +19,7 @@ function isValidTimeZone(zone: string): boolean {
 }
 
 // Reads and validates the environment once at start; an invalid value stops the process.
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+export function loadConfig(env: Readonly<Record<string, string | undefined>> = process.env): Config {
   const mode = env['DEPLOY_MODE'] ?? 'internal'
   if (mode !== 'internal' && mode !== 'public') {
     throw new Error(`DEPLOY_MODE must be "internal" or "public", got "${mode}"`)

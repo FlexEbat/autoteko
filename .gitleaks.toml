@@ -1,0 +1,8 @@
+title = "AUTEKO gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example environment file holds no values"
+paths = ['''deploy/env\.example''']

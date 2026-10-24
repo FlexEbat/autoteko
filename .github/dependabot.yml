@@ -1,7 +1,10 @@
 version: 2
 updates:
   - package-ecosystem: 'npm'
-    directory: '/'
+    directories:
+      - '/'
+      - '/apps/web'
+      - '/packages/shared'
     schedule:
       interval: 'weekly'
       day: 'monday'
@@ -22,12 +25,28 @@ updates:
         dependency-type: 'development'
         update-types: ['minor', 'patch']
     ignore:
-      # Next.js, React and ESLint config are upgraded together by hand
+      # Next.js and React are upgraded together by hand
       - dependency-name: 'next'
-        update-types: ['version-update:semver-major']
-      - dependency-name: 'eslint-config-next'
         update-types: ['version-update:semver-major']
       - dependency-name: 'react'
         update-types: ['version-update:semver-major']
       - dependency-name: 'react-dom'
         update-types: ['version-update:semver-major']
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    labels:
+      - 'dependencies'
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    labels:
+      - 'dependencies'

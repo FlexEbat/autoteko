@@ -20,3 +20,17 @@ export const CYRILLIC_LOOKALIKES: Readonly<Record<string, string>> = {
   т: 't',
   х: 'x',
 }
+
+// Words of the tech.md format that the check scripts in scripts/ look for.
+export const SPEC_FORMAT = {
+  slice: 'Слайс',
+  criteria: 'Критерии приёмки',
+  manual: 'ручной',
+  localization: 'Локализация',
+  deferred: 'отложена',
+  enabled: 'включена',
+  templateMark: 'ШАБЛОН',
+  version: 'Версия',
+  sourceLanguage: 'язык исходника',
+  documentLanguages: 'языки продукта и документов',
+} as const

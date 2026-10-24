@@ -76,3 +76,16 @@ describe('sql tag', () => {
     expect(rows.map((r) => r.a)).toEqual(['T1', 'T3'])
   })
 })
+
+describe('openPool', () => {
+  test('refuses to open without an address', async () => {
+    const { openPool } = await import('../src/server/data/db.ts')
+    const saved = process.env['DATABASE_URL']
+    delete process.env['DATABASE_URL']
+    try {
+      expect(() => openPool()).toThrow(/DATABASE_URL/)
+    } finally {
+      if (saved !== undefined) process.env['DATABASE_URL'] = saved
+    }
+  })
+})

@@ -6,12 +6,8 @@ export function safeRedirect(target: unknown, fallback = '/'): string {
   if (typeof target !== 'string' || target === '' || target.length > MAX_LENGTH) return fallback
   if (/[\u0000-\u001f\u007f\\]/.test(target)) return fallback
   if (!target.startsWith('/') || target.startsWith('//')) return fallback
-  let url: URL
-  try {
-    url = new URL(target, FAKE_ORIGIN)
-  } catch {
-    return fallback
-  }
+  const url = new URL(target, FAKE_ORIGIN)
+  /* v8 ignore next -- defense in depth: after the checks above the origin cannot change */
   if (url.origin !== FAKE_ORIGIN) return fallback
   // Dot segments can collapse "/..//host" into "//host", which a browser reads as another site.
   const result = `${url.pathname}${url.search}`

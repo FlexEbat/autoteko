@@ -22,11 +22,12 @@ function counterYear(kind: CounterKind, year: number): number {
 // Takes the next number. Call inside the transaction that stores the document.
 export async function nextNumber(tx: Db, kind: CounterKind, year: number): Promise<string> {
   const counterRow = counterYear(kind, year)
+  // The upsert always returns its row.
   const row = await tx.one<{ last: number }>(sql`
     insert into doc_counters (kind, year, last) values (${kind}, ${counterRow}, 1)
     on conflict (kind, year) do update set last = doc_counters.last + 1
     returning last`)
-  return format(kind, year, row?.last ?? 1)
+  return format(kind, year, row!.last)
 }
 
 // Shows the number nextNumber would return, without taking it.

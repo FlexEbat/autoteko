@@ -84,6 +84,7 @@ export async function migrate(db: Db): Promise<{ from: number; to: number }> {
   })
 }
 
+/* v8 ignore start -- command-line entry, exercised by the `db:migrate` npm task */
 // `npm run db:migrate`: runs under the migrator role.
 if (import.meta.main) {
   const url = process.env['DATABASE_MIGRATOR_URL'] ?? process.env['DATABASE_URL']
@@ -95,3 +96,4 @@ if (import.meta.main) {
     await pool.close()
   }
 }
+/* v8 ignore stop */
